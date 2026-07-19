@@ -118,7 +118,13 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
               children: [
                 DocumentarySortMenu(
                   selected: _sort,
-                  onChanged: (sort) => setState(() => _sort = sort),
+                  onChanged: (sort) {
+                    setState(() {
+                      // Tapping the already-active sort option again
+                      // clears the filter back to the default (Popular).
+                      _sort = (sort == _sort) ? DocumentarySortOption.popularity : sort;
+                    });
+                  },
                 ),
                 Expanded(
                   child: DocumentaryTimeFilterBar(
