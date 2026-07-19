@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/providers/auth_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/settings_screen.dart';
+import 'screens/dashboard/dashboard_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -40,7 +40,7 @@ class AuthGate extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (auth.isLoggedIn) {
-      return const SettingsScreen();
+      return const DashboardScreen();
     }
     return const LoginScreen();
   }
