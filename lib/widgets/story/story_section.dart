@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/models/story_model.dart';
 import 'story_card.dart';
+import 'auto_scroll_story_list.dart';
 
 /// One horizontal-scrolling row of stories with a title + "See all".
 /// Reused for every section (Trending, Recently Added, Top Rated, etc.)
 /// -- only the list of stories and the stat shown per card change.
+///
+/// Set [autoScroll] to true for sections that should continuously
+/// scroll themselves (e.g. Trending, Recently Added). Leave it false
+/// (default) for normal, manually-swiped sections.
 class StorySection extends StatelessWidget {
   final String title;
   final IconData? titleIcon;
@@ -17,6 +22,7 @@ class StorySection extends StatelessWidget {
 
   final ValueChanged<StoryModel>? onStoryTap;
   final VoidCallback? onSeeAll;
+  final bool autoScroll;
 
   const StorySection({
     super.key,
@@ -27,6 +33,7 @@ class StorySection extends StatelessWidget {
     this.statIcon,
     this.onStoryTap,
     this.onSeeAll,
+    this.autoScroll = false,
   });
 
   @override
@@ -63,21 +70,28 @@ class StorySection extends StatelessWidget {
         ),
         SizedBox(
           height: 254,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: stories.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
-            itemBuilder: (context, index) {
-              final story = stories[index];
-              return StoryCard(
-                story: story,
-                statLabel: statLabelBuilder?.call(story),
-                statIcon: statIcon,
-                onTap: () => onStoryTap?.call(story),
-              );
-            },
-          ),
+          child: autoScroll
+              ? AutoScrollStoryList(
+                  stories: stories,
+                  statIcon: statIcon,
+                  statLabelBuilder: statLabelBuilder,
+                  onStoryTap: onStoryTap,
+                )
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: stories.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  itemBuilder: (context, index) {
+                    final story = stories[index];
+                    return StoryCard(
+                      story: story,
+                      statLabel: statLabelBuilder?.call(story),
+                      statIcon: statIcon,
+                      onTap: () => onStoryTap?.call(story),
+                    );
+                  },
+                ),
         ),
       ],
     );
