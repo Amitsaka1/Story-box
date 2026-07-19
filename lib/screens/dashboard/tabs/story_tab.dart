@@ -87,6 +87,32 @@ class _StoryTabState extends State<StoryTab> {
               ),
             ),
           )
+        else if (_selectedCategory != 'All')
+          // A specific category is selected -- skip all the ranked
+          // sections and just show every matching story in a simple
+          // 3-column grid.
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.56,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final story = stories[index];
+                  return StoryCard(
+                    story: story,
+                    statLabel: '${story.rating.toStringAsFixed(1)} / 5.0',
+                    statIcon: Icons.star,
+                  );
+                },
+                childCount: stories.length,
+              ),
+            ),
+          )
         else
           SliverList(
             delegate: SliverChildListDelegate([
