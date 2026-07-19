@@ -11,6 +11,19 @@ class StoryModel {
   final int commentCount;
   final DateTime addedAt;
 
+  /// True if the current user has started (but not finished) this
+  /// story -- drives the "Watching" section. In a real backend this
+  /// would come from a per-user progress record, not the story itself.
+  final bool isWatching;
+
+  /// 0.0 - 1.0 progress, only meaningful when [isWatching] is true.
+  final double watchProgress;
+
+  /// Combined "popularity" score, same idea as the Documentary model --
+  /// used to rank the "Top 20" trending screen.
+  double get popularityScore =>
+      (viewCount * 1.0) + (likeCount * 4.0) + (commentCount * 8.0) + (rating * 20000);
+
   const StoryModel({
     required this.id,
     required this.title,
@@ -21,6 +34,8 @@ class StoryModel {
     required this.likeCount,
     required this.commentCount,
     required this.addedAt,
+    this.isWatching = false,
+    this.watchProgress = 0.0,
   });
 
   /// Compact display like "12K", "3.4M" for view/like/comment counts.
