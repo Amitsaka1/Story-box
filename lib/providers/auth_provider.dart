@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'auth_events.dart';
-import 'auth_service.dart';
-import 'token_storage.dart';
-import 'user_model.dart';
+import 'package:my_app/core/auth_events.dart';
+import 'package:my_app/services/auth_service.dart';
+import 'package:my_app/core/token_storage.dart';
+import 'package:my_app/models/user_model.dart';
 
 class AuthProvider extends ChangeNotifier {
   AuthProvider() {
@@ -17,9 +17,6 @@ class AuthProvider extends ChangeNotifier {
   UserModel? currentUser;
   bool isLoading = false;
   String? lastError;
-
-  // Set when the backend force-logs-out this session, so the UI can show
-  // *why* (e.g. "signed in on another device") instead of a silent kick.
   ForceLogoutReason? lastForceLogoutReason;
 
   bool get isLoggedIn => currentUser != null;
@@ -43,7 +40,6 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> login({
     required String username,
     required String password,
-    required String captchaToken,
   }) async {
     isLoading = true;
     lastError = null;
@@ -52,7 +48,6 @@ class AuthProvider extends ChangeNotifier {
       currentUser = await _authService.login(
         username: username,
         password: password,
-        captchaToken: captchaToken,
         formRenderedAt: DateTime.now().millisecondsSinceEpoch,
       );
       return true;
@@ -94,4 +89,3 @@ class AuthProvider extends ChangeNotifier {
     super.dispose();
   }
 }
-
