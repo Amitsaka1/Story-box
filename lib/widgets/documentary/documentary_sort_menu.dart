@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 /// The ways a documentary list can be sorted. "popularity" is the
 /// default (combined rating+like+comment+view score) used for "All".
+/// Treated as the "no filter applied" state -- the green dot only
+/// shows when the user picks something other than this.
 enum DocumentarySortOption { popularity, rating, likes, comments, views }
 
 extension DocumentarySortOptionLabel on DocumentarySortOption {
@@ -36,9 +38,10 @@ extension DocumentarySortOptionLabel on DocumentarySortOption {
   }
 }
 
-/// A compact button that opens a dropdown menu to pick how the grid
-/// is sorted (Rating / Likes / Comments / Views / Popular). Sits next
-/// to the time filter chips -- pure UI, parent owns the selected value.
+/// A compact icon-only button that opens a dropdown menu to pick how
+/// the grid is sorted (Rating / Likes / Comments / Views / Popular).
+/// Shows a small green dot when a non-default sort is active, instead
+/// of spelling out the sort name -- pure UI, parent owns the value.
 class DocumentarySortMenu extends StatelessWidget {
   final DocumentarySortOption selected;
   final ValueChanged<DocumentarySortOption> onChanged;
@@ -52,6 +55,7 @@ class DocumentarySortMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isFilterActive = selected != DocumentarySortOption.popularity;
 
     return PopupMenuButton<DocumentarySortOption>(
       initialValue: selected,
@@ -75,23 +79,31 @@ class DocumentarySortMenu extends StatelessWidget {
         );
       }).toList(),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        margin: const EdgeInsets.only(right: 20),
+        width: 40,
+        height: 40,
+        margin: const EdgeInsets.only(left: 20, right: 10),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
           children: [
-            Icon(Icons.sort, size: 18, color: colorScheme.onSurfaceVariant),
-            const SizedBox(width: 6),
-            Text(
-              selected.label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(width: 2),
-            Icon(Icons.arrow_drop_down, size: 18, color: colorScheme.onSurfaceVariant),
+            Icon(Icons.sort, size: 20, color: colorScheme.onSurfaceVariant),
+            if (isFilterActive)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
