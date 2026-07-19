@@ -123,6 +123,7 @@ class _StoryTabState extends State<StoryTab> {
                 stories: trending,
                 statIcon: Icons.visibility_outlined,
                 statLabelBuilder: (s) => '${StoryModel.formatCount(s.viewCount)} views',
+                autoScroll: true,
               ),
               const SizedBox(height: 24),
               StorySection(
@@ -131,6 +132,7 @@ class _StoryTabState extends State<StoryTab> {
                 stories: recentlyAdded,
                 statIcon: Icons.schedule,
                 statLabelBuilder: (s) => _timeAgo(s.addedAt),
+                autoScroll: true,
               ),
               const SizedBox(height: 24),
               StorySection(
