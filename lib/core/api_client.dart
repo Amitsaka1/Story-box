@@ -3,7 +3,7 @@ import 'token_storage.dart';
 import 'auth_events.dart';
 
 /// EDIT THIS: your backend's base URL (Render/wherever you deployed it).
-const String kApiBaseUrl = 'https://your-backend.onrender.com';
+const String kApiBaseUrl = 'https://story-box-backend-yim1.onrender.com';
 
 class ApiClient {
   ApiClient._internal() {
