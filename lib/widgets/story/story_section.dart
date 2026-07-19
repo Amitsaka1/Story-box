@@ -1,12 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:my_app/models/story_model.dart';
-import 'story_card.dart';
-
-/// One horizontal-scrolling row of stories with a title + "See all".
-/// Reused for every section (Trending, Recently Added, Top Rated, etc.)
-/// -- only the list of stories and the stat shown per card change.
 class StorySection extends StatelessWidget {
   final String title;
+  final IconData? titleIcon;
   final List<StoryModel> stories;
 
   /// Given a story, return the small stat text to show under its title
@@ -20,6 +14,7 @@ class StorySection extends StatelessWidget {
   const StorySection({
     super.key,
     required this.title,
+    this.titleIcon,
     required this.stories,
     this.statLabelBuilder,
     this.statIcon,
@@ -39,9 +34,17 @@ class StorySection extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              Row(
+                children: [
+                  if (titleIcon != null) ...[
+                    Icon(titleIcon, size: 20, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
               ),
               if (onSeeAll != null)
                 TextButton(
@@ -52,24 +55,5 @@ class StorySection extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 230,
+          height: 254,
           child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: stories.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
-            itemBuilder: (context, index) {
-              final story = stories[index];
-              return StoryCard(
-                story: story,
-                statLabel: statLabelBuilder?.call(story),
-                statIcon: statIcon,
-                onTap: () => onStoryTap?.call(story),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
