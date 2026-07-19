@@ -116,15 +116,15 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
           sliver: SliverToBoxAdapter(
             child: Row(
               children: [
+                DocumentarySortMenu(
+                  selected: _sort,
+                  onChanged: (sort) => setState(() => _sort = sort),
+                ),
                 Expanded(
                   child: DocumentaryTimeFilterBar(
                     selected: _timeFilter,
                     onSelected: (filter) => setState(() => _timeFilter = filter),
                   ),
-                ),
-                DocumentarySortMenu(
-                  selected: _sort,
-                  onChanged: (sort) => setState(() => _sort = sort),
                 ),
               ],
             ),
@@ -162,7 +162,7 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
                 crossAxisCount: 3,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 12,
-                childAspectRatio: 0.56,
+                childAspectRatio: 0.48,
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
