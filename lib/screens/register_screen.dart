@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_app/services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -12,15 +13,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-
-  // Bot-check ke liye: form kab screen pe render hua, ye time backend
-  // ko bhejenge (formRenderedAt). Honeypot field neeche hai (invisible).
-  final int _formRenderedAt = DateTime.now().millisecondsSinceEpoch;
   final _honeypotController = TextEditingController();
+  final int _formRenderedAt = DateTime.now().millisecondsSinceEpoch;
+  final _authService = AuthService();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -56,13 +56,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  void _handleRegisterPressed() {
-    if (_formKey.currentState!.validate()) {
-      // Backend call yahan Step 3 me aayega (auth_service se jud jaayega)
-      setState(() => _isLoading = true);
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) setState(() => _isLoading = false);
-      });
+  Future<void> _handleRegisterPressed() async {
+    setState(() => _errorMessage = null);
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _authService.register(
+        username: _usernameController.text.trim(),
+        password: _passwordController.text,
+        honeypot: _honeypotController.text,
+        formRenderedAt: _formRenderedAt,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account ban gaya! Ab login karo.')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -86,17 +101,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 32),
-
-                  // Honeypot: real users ko ye dikhta hi nahi (0 height/opacity),
-                  // sirf bots isko auto-fill karte hain.
                   Offstage(
                     offstage: true,
-                    child: TextFormField(
-                      controller: _honeypotController,
-                      autofocus: false,
-                    ),
+                    child: TextFormField(controller: _honeypotController, autofocus: false),
                   ),
-
                   TextFormField(
                     controller: _usernameController,
                     decoration: const InputDecoration(
@@ -136,6 +144,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     validator: _validateConfirmPassword,
                   ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_errorMessage!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+                  ],
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _handleRegisterPressed,
