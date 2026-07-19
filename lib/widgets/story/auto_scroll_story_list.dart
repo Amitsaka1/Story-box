@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:my_app/models/story_model.dart';
 import 'story_card.dart';
 
-/// A horizontal story list that scrolls itself continuously to the
-/// left, looping forever -- used for "always moving" sections like
-/// Trending / Recently Added. The list is internally duplicated so
-/// that once it scrolls past the end, it snaps back seamlessly to
-/// the start (looks infinite to the eye).
+/// A horizontal story list that automatically slides forward by one
+/// card every few seconds (smooth animated step, not a continuous
+/// scroll), while still allowing the user to manually swipe left/right
+/// whenever they want. The list is internally duplicated so the loop
+/// back to the start is seamless.
 class AutoScrollStoryList extends StatefulWidget {
   final List<StoryModel> stories;
   final IconData? statIcon;
@@ -29,8 +29,9 @@ class AutoScrollStoryList extends StatefulWidget {
 class _AutoScrollStoryListState extends State<AutoScrollStoryList> {
   static const double _cardWidth = 130;
   static const double _cardSpacing = 14;
-  static const double _pixelsPerTick = 0.6; // scroll speed -- tweak to taste
-  static const Duration _tickDuration = Duration(milliseconds: 16);
+  static const double _step = _cardWidth + _cardSpacing;
+  static const Duration _interval = Duration(seconds: 3);
+  static const Duration _animDuration = Duration(milliseconds: 550);
 
   final ScrollController _controller = ScrollController();
   Timer? _timer;
@@ -39,23 +40,28 @@ class _AutoScrollStoryListState extends State<AutoScrollStoryList> {
   @override
   void initState() {
     super.initState();
-    _singleSetWidth = widget.stories.length * (_cardWidth + _cardSpacing);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startAutoScroll());
+    _singleSetWidth = widget.stories.length * _step;
+    if (widget.stories.length >= 2) {
+      _timer = Timer.periodic(_interval, (_) => _advance());
+    }
   }
 
-  void _startAutoScroll() {
-    if (widget.stories.length < 2) return; // nothing meaningful to loop
-    _timer = Timer.periodic(_tickDuration, (_) {
-      if (!_controller.hasClients) return;
-      final next = _controller.offset + _pixelsPerTick;
-      if (next >= _singleSetWidth) {
-        // Past one full lap -- jump back by exactly one set's width.
-        // Because the list is duplicated below, this is seamless.
-        _controller.jumpTo(next - _singleSetWidth);
-      } else {
-        _controller.jumpTo(next);
-      }
-    });
+  Future<void> _advance() async {
+    if (!_controller.hasClients) return;
+
+    final target = _controller.offset + _step;
+    await _controller.animateTo(
+      target,
+      duration: _animDuration,
+      curve: Curves.easeInOut,
+    );
+
+    // Once we've slid past one full lap, snap back silently to the
+    // equivalent position at the start -- because the list below is
+    // duplicated, this jump is visually seamless.
+    if (_controller.hasClients && _controller.offset >= _singleSetWidth) {
+      _controller.jumpTo(_controller.offset - _singleSetWidth);
+    }
   }
 
   @override
@@ -72,9 +78,9 @@ class _AutoScrollStoryListState extends State<AutoScrollStoryList> {
     return ListView.separated(
       controller: _controller,
       scrollDirection: Axis.horizontal,
-      // Auto-scroll drives this list, so manual swiping is disabled --
-      // taps on cards still work fine.
-      physics: const NeverScrollableScrollPhysics(),
+      // Manual swiping stays enabled -- the timer above just nudges
+      // the same controller every few seconds in between user drags.
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: widget.stories.length * loopCount,
       separatorBuilder: (_, __) => const SizedBox(width: _cardSpacing),
