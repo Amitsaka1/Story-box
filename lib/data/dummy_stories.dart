@@ -1,8 +1,13 @@
 import 'package:my_app/models/story_model.dart';
 
 /// Sample data so the UI has something to render. Replace this with a
-/// real API call later (e.g. StoryService.fetchStories()) -- the widgets
-/// don't care where the List<StoryModel> comes from.
+/// real API call later -- the widgets don't care where the
+/// List<StoryModel> comes from.
+///
+/// addedAt values are spread across today / yesterday / this week /
+/// this month / this year on purpose, so the time filters naturally
+/// split them without any manual "which bucket" tagging. A few entries
+/// have isWatching: true to populate the "Watching" section.
 final List<StoryModel> dummyStories = [
   StoryModel(
     id: '1',
@@ -14,6 +19,8 @@ final List<StoryModel> dummyStories = [
     likeCount: 98000,
     commentCount: 4300,
     addedAt: DateTime.now().subtract(const Duration(hours: 5)),
+    isWatching: true,
+    watchProgress: 0.42,
   ),
   StoryModel(
     id: '2',
@@ -24,7 +31,7 @@ final List<StoryModel> dummyStories = [
     viewCount: 3400000,
     likeCount: 210000,
     commentCount: 15200,
-    addedAt: DateTime.now().subtract(const Duration(days: 1)),
+    addedAt: DateTime.now().subtract(const Duration(hours: 10)),
   ),
   StoryModel(
     id: '3',
@@ -36,6 +43,8 @@ final List<StoryModel> dummyStories = [
     likeCount: 67000,
     commentCount: 2100,
     addedAt: DateTime.now().subtract(const Duration(hours: 12)),
+    isWatching: true,
+    watchProgress: 0.75,
   ),
   StoryModel(
     id: '4',
@@ -46,7 +55,7 @@ final List<StoryModel> dummyStories = [
     viewCount: 5200000,
     likeCount: 340000,
     commentCount: 22000,
-    addedAt: DateTime.now().subtract(const Duration(days: 3)),
+    addedAt: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
   ),
   StoryModel(
     id: '5',
@@ -57,7 +66,7 @@ final List<StoryModel> dummyStories = [
     viewCount: 430000,
     likeCount: 29000,
     commentCount: 980,
-    addedAt: DateTime.now().subtract(const Duration(hours: 2)),
+    addedAt: DateTime.now().subtract(const Duration(days: 1, hours: 8)),
   ),
   StoryModel(
     id: '6',
@@ -68,7 +77,9 @@ final List<StoryModel> dummyStories = [
     viewCount: 2100000,
     likeCount: 145000,
     commentCount: 8700,
-    addedAt: DateTime.now().subtract(const Duration(days: 7)),
+    addedAt: DateTime.now().subtract(const Duration(days: 3)),
+    isWatching: true,
+    watchProgress: 0.20,
   ),
   StoryModel(
     id: '7',
@@ -92,11 +103,143 @@ final List<StoryModel> dummyStories = [
     commentCount: 1500,
     addedAt: DateTime.now().subtract(const Duration(days: 2)),
   ),
+  StoryModel(
+    id: '9',
+    title: 'Crimson Tide Rising',
+    coverImageUrl: 'https://picsum.photos/seed/story9/400/560',
+    category: 'Thriller',
+    rating: 4.5,
+    viewCount: 1990000,
+    likeCount: 132000,
+    commentCount: 7100,
+    addedAt: DateTime.now().subtract(const Duration(days: 4)),
+  ),
+  StoryModel(
+    id: '10',
+    title: 'The Clockmaker\'s Secret',
+    coverImageUrl: 'https://picsum.photos/seed/story10/400/560',
+    category: 'Drama',
+    rating: 4.3,
+    viewCount: 670000,
+    likeCount: 45000,
+    commentCount: 1900,
+    addedAt: DateTime.now().subtract(const Duration(days: 5)),
+  ),
+  StoryModel(
+    id: '11',
+    title: 'Echoes of the Deep',
+    coverImageUrl: 'https://picsum.photos/seed/story11/400/560',
+    category: 'Adventure',
+    rating: 4.7,
+    viewCount: 2800000,
+    likeCount: 190000,
+    commentCount: 9600,
+    addedAt: DateTime.now().subtract(const Duration(days: 6)),
+  ),
+  StoryModel(
+    id: '12',
+    title: 'A House of Glass',
+    coverImageUrl: 'https://picsum.photos/seed/story12/400/560',
+    category: 'Romance',
+    rating: 4.0,
+    viewCount: 380000,
+    likeCount: 24000,
+    commentCount: 850,
+    addedAt: DateTime.now().subtract(const Duration(days: 12)),
+  ),
+  StoryModel(
+    id: '13',
+    title: 'The Hollow Woods',
+    coverImageUrl: 'https://picsum.photos/seed/story13/400/560',
+    category: 'Horror',
+    rating: 4.6,
+    viewCount: 2450000,
+    likeCount: 168000,
+    commentCount: 11200,
+    addedAt: DateTime.now().subtract(const Duration(days: 18)),
+  ),
+  StoryModel(
+    id: '14',
+    title: 'Threads of Fate',
+    coverImageUrl: 'https://picsum.photos/seed/story14/400/560',
+    category: 'Drama',
+    rating: 4.4,
+    viewCount: 910000,
+    likeCount: 61000,
+    commentCount: 3200,
+    addedAt: DateTime.now().subtract(const Duration(days: 22)),
+  ),
+  StoryModel(
+    id: '15',
+    title: 'The Runaway Kite',
+    coverImageUrl: 'https://picsum.photos/seed/story15/400/560',
+    category: 'Family',
+    rating: 4.1,
+    viewCount: 310000,
+    likeCount: 19000,
+    commentCount: 640,
+    addedAt: DateTime.now().subtract(const Duration(days: 25)),
+  ),
+  StoryModel(
+    id: '16',
+    title: 'The Vanishing Point',
+    coverImageUrl: 'https://picsum.photos/seed/story16/400/560',
+    category: 'Thriller',
+    rating: 4.8,
+    viewCount: 4100000,
+    likeCount: 275000,
+    commentCount: 18400,
+    addedAt: DateTime.now().subtract(const Duration(days: 60)),
+  ),
+  StoryModel(
+    id: '17',
+    title: 'Summit of Silence',
+    coverImageUrl: 'https://picsum.photos/seed/story17/400/560',
+    category: 'Adventure',
+    rating: 4.5,
+    viewCount: 1650000,
+    likeCount: 108000,
+    commentCount: 5300,
+    addedAt: DateTime.now().subtract(const Duration(days: 90)),
+  ),
+  StoryModel(
+    id: '18',
+    title: 'The Widow\'s Garden',
+    coverImageUrl: 'https://picsum.photos/seed/story18/400/560',
+    category: 'Drama',
+    rating: 4.2,
+    viewCount: 520000,
+    likeCount: 33000,
+    commentCount: 1400,
+    addedAt: DateTime.now().subtract(const Duration(days: 150)),
+  ),
+  StoryModel(
+    id: '19',
+    title: 'Static on the Line',
+    coverImageUrl: 'https://picsum.photos/seed/story19/400/560',
+    category: 'Horror',
+    rating: 4.3,
+    viewCount: 870000,
+    likeCount: 54000,
+    commentCount: 2600,
+    addedAt: DateTime.now().subtract(const Duration(days: 210)),
+  ),
+  StoryModel(
+    id: '20',
+    title: 'The Last Train Home',
+    coverImageUrl: 'https://picsum.photos/seed/story20/400/560',
+    category: 'Family',
+    rating: 4.6,
+    viewCount: 1980000,
+    likeCount: 134000,
+    commentCount: 7900,
+    addedAt: DateTime.now().subtract(const Duration(days: 300)),
+  ),
 ];
 
-/// Unique category names, "All" first -- used to build the filter chips.
+/// Unique category names, sorted -- used to build the category filter.
 List<String> get storyCategories {
   final categories = dummyStories.map((s) => s.category).toSet().toList();
   categories.sort();
-  return ['All', ...categories];
+  return categories;
 }
