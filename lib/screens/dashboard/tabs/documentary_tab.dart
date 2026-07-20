@@ -164,7 +164,7 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'No documentaries in "${_timeFilter.label}"',
+                      'documentary.no_documentaries_filter'.tr(namedArgs: {'filter': _timeFilter.label}),
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ],
