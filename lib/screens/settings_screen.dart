@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/providers/auth_provider.dart';
+import 'package:my_app/providers/theme_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,7 +13,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   // Local-only preferences (no backend endpoint for these yet).
   // Wire these to shared_preferences yourself if you want them to persist.
-  String _theme = 'System';
   bool _pushEnabled = true;
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
@@ -21,6 +21,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
+    final themeProvider = context.watch<ThemeProvider>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -38,22 +39,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ---------------- Appearance (LOCAL ONLY) ----------------
+          // ---------------- Appearance (persisted via ThemeProvider) ----------------
           _SectionTitle('Appearance'),
           Card(
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.dark_mode_outlined),
+                SwitchListTile(
+                  secondary: const Icon(Icons.dark_mode_outlined),
                   title: const Text('Dark mode'),
-                  trailing: DropdownButton<String>(
-                    value: _theme,
-                    underline: const SizedBox(),
-                    items: ['Light', 'Dark', 'System']
-                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _theme = v ?? _theme),
-                  ),
+                  value: themeProvider.isDarkMode,
+                  onChanged: (v) => context.read<ThemeProvider>().setDarkMode(v),
                 ),
               ],
             ),
