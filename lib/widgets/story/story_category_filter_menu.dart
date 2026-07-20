@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 /// Sentinel value meaning "no category filter" -- shown as "All" in
 /// the menu, but doesn't get its own chip like Documentary's sort did.
+/// This stays the fixed English word internally (used for comparisons
+/// everywhere), only its *displayed* label is translated below.
 const String kAllCategories = 'All';
 
 /// A compact icon-only button that opens a dropdown menu to pick a
@@ -41,7 +44,7 @@ class StoryCategoryFilterMenu extends StatelessWidget {
           value: option,
           child: Row(
             children: [
-              Text(option),
+              Text(option == kAllCategories ? 'story.category_all'.tr() : option),
               if (option == selected) ...[
                 const Spacer(),
                 Icon(Icons.check, size: 18, color: colorScheme.primary),
