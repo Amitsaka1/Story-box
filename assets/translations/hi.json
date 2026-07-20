@@ -68,5 +68,13 @@
     "password_changed_success": "पासवर्ड सफलतापूर्वक बदल गया।",
     "done": "हो गया",
     "change_password_generic_error": "पासवर्ड नहीं बदला जा सका।"
+  },
+  "dashboard": {
+    "story_tab": "स्टोरी",
+    "documentary_tab": "डॉक्यूमेंट्री",
+    "history_tab": "इतिहास",
+    "subscription_tab": "सब्सक्रिप्शन",
+    "trending_tooltip": "ट्रेंडिंग",
+    "settings_tooltip": "सेटिंग्स"
   }
   }
