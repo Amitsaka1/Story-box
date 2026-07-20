@@ -114,11 +114,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
 
           // ---------------- Activity / Support (LOCAL / placeholder) ----------------
-          _SectionTitle('Activity'),
+          _SectionTitle('settings.activity'.tr()),
           Card(
             child: ListTile(
               leading: const Icon(Icons.history),
-              title: const Text('History'),
+              title: Text('settings.history'.tr()),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 // TODO: wire to a real endpoint once you build one
@@ -127,26 +127,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          _SectionTitle('Support'),
+          _SectionTitle('settings.support'.tr()),
           Card(
             child: Column(
               children: [
                 ListTile(
                   leading: const Icon(Icons.help_outline),
-                  title: const Text('Help & contact support'),
+                  title: Text('settings.help_contact'.tr()),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {},
                 ),
                 ListTile(
                   leading: const Icon(Icons.star_border),
-                  title: const Text('Rate the app / feedback'),
+                  title: Text('settings.rate_feedback'.tr()),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {},
                 ),
                 ListTile(
                   leading: const Icon(Icons.info_outline),
-                  title: const Text('About'),
-                  subtitle: const Text('Version 1.0.0'),
+                  title: Text('settings.about'.tr()),
+                  subtitle: Text('settings.version'.tr()),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {},
                 ),
