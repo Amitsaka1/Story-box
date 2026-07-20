@@ -25,17 +25,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final themeProvider = context.watch<ThemeProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text('settings.title'.tr())),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // ---------------- Account (backend-connected) ----------------
-          _SectionTitle('Account'),
+          _SectionTitle('settings.account'.tr()),
           Card(
             child: ListTile(
               leading: CircleAvatar(child: Text((user?.username ?? '?').substring(0, 1).toUpperCase())),
-              title: Text(user?.username ?? 'Loading...'),
-              subtitle: user != null ? Text('Member since ${user.createdAt.toLocal().toString().split(' ').first}') : null,
+              title: Text(user?.username ?? 'settings.loading'.tr()),
+              subtitle: user != null
+                  ? Text('settings.member_since'.tr(namedArgs: {
+                      'date': user.createdAt.toLocal().toString().split(' ').first,
+                    }))
+                  : null,
             ),
           ),
           const SizedBox(height: 20),
