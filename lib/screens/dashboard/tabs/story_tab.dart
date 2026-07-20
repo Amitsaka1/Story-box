@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/models/story_model.dart';
 import 'package:my_app/data/dummy_stories.dart';
-import 'package:my_app/widgets/story/story_section.dart';
-import 'package:my_app/widgets/story/category_chip_bar.dart';
 import 'package:my_app/widgets/story/story_card.dart';
+import 'package:my_app/widgets/story/story_section.dart';
+import 'package:my_app/widgets/story/story_category_filter_menu.dart';
+import 'package:my_app/widgets/story/story_time_filter_bar.dart';
 
-/// Advanced Story dashboard: category filter up top, then multiple
-/// horizontal sections (Trending, Recently Added, Top Rated, Most
-/// Viewed, Most Liked, Most Commented). Filtering by category re-runs
-/// all the sort logic below on just the matching stories.
+/// Story dashboard: category icon-filter + time chips up top, then
+/// "Recently Added" and "Watching" horizontal sections, then every
+/// matching story in a 3-column grid underneath. Trending has moved
+/// to its own full "Top 20" screen (see TrendingScreen), reached via
+/// the app bar icon -- it's no longer a section on this page.
 class StoryTab extends StatefulWidget {
   const StoryTab({super.key});
 
@@ -17,160 +19,38 @@ class StoryTab extends StatefulWidget {
 }
 
 class _StoryTabState extends State<StoryTab> {
-  String _selectedCategory = 'All';
+  String _selectedCategory = kAllCategories;
+  StoryTimeFilter _timeFilter = StoryTimeFilter.all;
 
-  // Ranked sections (Trending, Top Rated, etc.) never show more than this
-  // many cards -- keeps each row scannable instead of endless.
-  static const int _rankedSectionLimit = 10;
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
-  // "Recently Added" only counts stories added within this window.
-  // A story that was added yesterday and nothing new came in today will
-  // naturally disappear from this section once it falls outside 24h --
-  // no manual cleanup needed, it's just a filter on addedAt.
-  static const Duration _recentWindow = Duration(hours: 24);
-
-  List<StoryModel> get _filtered {
-    if (_selectedCategory == 'All') return dummyStories;
+  List<StoryModel> get _categoryFiltered {
+    if (_selectedCategory == kAllCategories) return dummyStories;
     return dummyStories.where((s) => s.category == _selectedCategory).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final stories = _filtered;
+  List<StoryModel> get _timeAndCategoryFiltered {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final source = _categoryFiltered;
 
-    // Each ranked section = same stories, sorted a different way, capped at 10.
-    final trending = ([...stories]..sort((a, b) => b.viewCount.compareTo(a.viewCount)))
-        .take(_rankedSectionLimit)
-        .toList();
-    final topRated = ([...stories]..sort((a, b) => b.rating.compareTo(a.rating)))
-        .take(_rankedSectionLimit)
-        .toList();
-    final mostViewed = ([...stories]..sort((a, b) => b.viewCount.compareTo(a.viewCount)))
-        .take(_rankedSectionLimit)
-        .toList();
-    final mostLiked = ([...stories]..sort((a, b) => b.likeCount.compareTo(a.likeCount)))
-        .take(_rankedSectionLimit)
-        .toList();
-    final mostCommented = ([...stories]..sort((a, b) => b.commentCount.compareTo(a.commentCount)))
-        .take(_rankedSectionLimit)
-        .toList();
-
-    // Recently Added: no cap on count, but only stories added in the
-    // last 24 hours qualify -- so it auto-empties (and the section
-    // auto-hides, see StorySection) if nothing new was uploaded today.
-    final recentlyAdded = stories.where((s) => now.difference(s.addedAt) <= _recentWindow).toList()
-      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
-
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(0, 16, 0, 16),
-          sliver: SliverToBoxAdapter(
-            child: CategoryChipBar(
-              categories: storyCategories,
-              selectedCategory: _selectedCategory,
-              onCategorySelected: (category) {
-                setState(() => _selectedCategory = category);
-              },
-            ),
-          ),
-        ),
-        if (stories.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: Text(
-                'No stories in "$_selectedCategory" yet.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-          )
-        else if (_selectedCategory != 'All')
-          // A specific category is selected -- skip all the ranked
-          // sections and just show every matching story in a simple
-          // 3-column grid.
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.56,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final story = stories[index];
-                  return StoryCard(
-                    story: story,
-                    statLabel: '${story.rating.toStringAsFixed(1)} / 5.0',
-                    statIcon: Icons.star,
-                  );
-                },
-                childCount: stories.length,
-              ),
-            ),
-          )
-        else
-          SliverList(
-            delegate: SliverChildListDelegate([
-              StorySection(
-                title: 'Trending Now',
-                titleIcon: Icons.local_fire_department,
-                stories: trending,
-                statIcon: Icons.visibility_outlined,
-                statLabelBuilder: (s) => '${StoryModel.formatCount(s.viewCount)} views',
-                autoScroll: true,
-              ),
-              const SizedBox(height: 24),
-              StorySection(
-                title: 'Recently Added',
-                titleIcon: Icons.fiber_new_outlined,
-                stories: recentlyAdded,
-                statIcon: Icons.schedule,
-                statLabelBuilder: (s) => _timeAgo(s.addedAt),
-                autoScroll: true,
-              ),
-              const SizedBox(height: 24),
-              StorySection(
-                title: 'Top Rated',
-                titleIcon: Icons.star_outline,
-                stories: topRated,
-                statIcon: Icons.star,
-                statLabelBuilder: (s) => '${s.rating.toStringAsFixed(1)} / 5.0',
-              ),
-              const SizedBox(height: 24),
-              StorySection(
-                title: 'Most Viewed',
-                titleIcon: Icons.visibility_outlined,
-                stories: mostViewed,
-                statIcon: Icons.visibility_outlined,
-                statLabelBuilder: (s) => '${StoryModel.formatCount(s.viewCount)} views',
-              ),
-              const SizedBox(height: 24),
-              StorySection(
-                title: 'Most Liked',
-                titleIcon: Icons.favorite_border,
-                stories: mostLiked,
-                statIcon: Icons.favorite_border,
-                statLabelBuilder: (s) => '${StoryModel.formatCount(s.likeCount)} likes',
-              ),
-              const SizedBox(height: 24),
-              StorySection(
-                title: 'Most Commented',
-                titleIcon: Icons.mode_comment_outlined,
-                stories: mostCommented,
-                statIcon: Icons.mode_comment_outlined,
-                statLabelBuilder: (s) => '${StoryModel.formatCount(s.commentCount)} comments',
-              ),
-              const SizedBox(height: 24),
-            ]),
-          ),
-      ],
-    );
+    switch (_timeFilter) {
+      case StoryTimeFilter.all:
+        return source;
+      case StoryTimeFilter.today:
+        return source.where((s) => _isSameDay(s.addedAt, today)).toList();
+      case StoryTimeFilter.yesterday:
+        return source.where((s) => _isSameDay(s.addedAt, yesterday)).toList();
+      case StoryTimeFilter.thisWeek:
+        final weekStart = today.subtract(const Duration(days: 6));
+        return source.where((s) => !s.addedAt.isBefore(weekStart)).toList();
+      case StoryTimeFilter.thisMonth:
+        return source.where((s) => s.addedAt.year == now.year && s.addedAt.month == now.month).toList();
+      case StoryTimeFilter.thisYear:
+        return source.where((s) => s.addedAt.year == now.year).toList();
+    }
   }
 
   String _timeAgo(DateTime time) {
@@ -178,5 +58,113 @@ class _StoryTabState extends State<StoryTab> {
     if (diff.inDays > 0) return '${diff.inDays}d ago';
     if (diff.inHours > 0) return '${diff.inHours}h ago';
     return '${diff.inMinutes}m ago';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // "Recently Added" and "Watching" always reflect the full library
+    // (not the category/time filter below) -- they're quick-access
+    // shelves, not part of the filtered browse experience.
+    final recentlyAdded = dummyStories
+        .where((s) => DateTime.now().difference(s.addedAt) <= const Duration(hours: 24))
+        .toList()
+      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+
+    final watching = dummyStories.where((s) => s.isWatching).toList();
+
+    // The grid below respects both filters.
+    final gridStories = [..._timeAndCategoryFiltered]
+      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                StoryCategoryFilterMenu(
+                  categories: storyCategories,
+                  selected: _selectedCategory,
+                  onChanged: (category) => setState(() => _selectedCategory = category),
+                ),
+                Expanded(
+                  child: StoryTimeFilterBar(
+                    selected: _timeFilter,
+                    onSelected: (filter) => setState(() => _timeFilter = filter),
+                  ),
+                ),
+                const SizedBox(width: 20),
+              ],
+            ),
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildListDelegate([
+            StorySection(
+              title: 'Recently Added',
+              titleIcon: Icons.fiber_new_outlined,
+              stories: recentlyAdded,
+              statIcon: Icons.schedule,
+              statLabelBuilder: (s) => _timeAgo(s.addedAt),
+              autoScroll: true,
+            ),
+            const SizedBox(height: 24),
+            StorySection(
+              title: 'Watching',
+              titleIcon: Icons.play_circle_outline,
+              stories: watching,
+              statIcon: Icons.hourglass_bottom,
+              statLabelBuilder: (s) => '${(s.watchProgress * 100).round()}% watched',
+            ),
+            const SizedBox(height: 8),
+          ]),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          sliver: SliverToBoxAdapter(
+            child: Text(
+              _selectedCategory == kAllCategories ? 'All Stories' : _selectedCategory,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+        if (gridStories.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Text(
+                'No stories found for this filter.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.48,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final story = gridStories[index];
+                  return StoryCard(
+                    story: story,
+                    statLabel: '${story.rating.toStringAsFixed(1)} / 5.0',
+                    statIcon: Icons.star,
+                  );
+                },
+                childCount: gridStories.length,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
