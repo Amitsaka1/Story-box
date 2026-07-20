@@ -74,25 +74,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
           
           // ---------------- Notifications (LOCAL ONLY) ----------------
-          _SectionTitle('Notifications'),
+          _SectionTitle('settings.notifications'.tr()),
           Card(
             child: Column(
               children: [
                 SwitchListTile(
                   secondary: const Icon(Icons.notifications_outlined),
-                  title: const Text('Push notifications'),
+                  title: Text('settings.push_notifications'.tr()),
                   value: _pushEnabled,
                   onChanged: (v) => setState(() => _pushEnabled = v),
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.volume_up_outlined),
-                  title: const Text('Sound'),
+                  title: Text('settings.sound'.tr()),
                   value: _soundEnabled,
                   onChanged: (v) => setState(() => _soundEnabled = v),
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.vibration),
-                  title: const Text('Vibration'),
+                  title: Text('settings.vibration'.tr()),
                   value: _vibrationEnabled,
                   onChanged: (v) => setState(() => _vibrationEnabled = v),
                 ),
@@ -102,11 +102,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
 
           // ---------------- Security (backend-connected) ----------------
-          _SectionTitle('Security'),
+          _SectionTitle('settings.security'.tr()),
           Card(
             child: ListTile(
               leading: const Icon(Icons.lock_outline),
-              title: const Text('Change password'),
+              title: Text('settings.change_password'.tr()),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showChangePasswordSheet(context),
             ),
