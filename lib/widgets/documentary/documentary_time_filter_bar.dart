@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:easy_localization/easy_localization.dart';
 /// The set of time buckets a documentary can fall into. Kept as an
 /// enum (not free strings) so the filtering logic in documentary_tab.dart
 /// can't typo a label and silently show nothing.
@@ -9,17 +9,17 @@ extension DocumentaryTimeFilterLabel on DocumentaryTimeFilter {
   String get label {
     switch (this) {
       case DocumentaryTimeFilter.all:
-        return 'All';
+        return 'story.time_all'.tr();
       case DocumentaryTimeFilter.today:
-        return 'Today';
+        return 'story.time_today'.tr();
       case DocumentaryTimeFilter.yesterday:
-        return 'Yesterday';
+        return 'story.time_yesterday'.tr();
       case DocumentaryTimeFilter.thisWeek:
-        return 'This Week';
+        return 'story.time_this_week'.tr();
       case DocumentaryTimeFilter.thisMonth:
-        return 'This Month';
+        return 'story.time_this_month'.tr();
       case DocumentaryTimeFilter.thisYear:
-        return 'This Year';
+        return 'story.time_this_year'.tr();
     }
   }
 }
