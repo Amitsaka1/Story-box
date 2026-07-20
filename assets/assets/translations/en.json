@@ -76,5 +76,26 @@
     "subscription_tab": "Subscription",
     "trending_tooltip": "Trending",
     "settings_tooltip": "Settings"
+  },
+  "story": {
+    "time_all": "All",
+    "time_today": "Today",
+    "time_yesterday": "Yesterday",
+    "time_this_week": "This Week",
+    "time_this_month": "This Month",
+    "time_this_year": "This Year",
+    "category_all": "All",
+    "recently_added": "Recently Added",
+    "watching": "Watching",
+    "all_stories": "All Stories",
+    "no_stories_filter": "No stories found for this filter.",
+    "days_ago": "{count}d ago",
+    "hours_ago": "{count}h ago",
+    "minutes_ago": "{count}m ago",
+    "percent_watched": "{percent}% watched",
+    "see_all": "See all",
+    "top20_title": "Top 20",
+    "all_categories": "All categories",
+    "no_stories_category": "No stories in \"{category}\" yet."
   }
 }
