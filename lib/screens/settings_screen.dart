@@ -360,11 +360,11 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
               children: [
                 const Icon(Icons.check_circle, color: Colors.green, size: 48),
                 const SizedBox(height: 12),
-                const Text('Password changed successfully.'),
+                Text('settings.password_changed_success'.tr()),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Done'),
+                  child: Text('settings.done'.tr()),
                 ),
               ],
             )
@@ -372,24 +372,24 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Change password', style: Theme.of(context).textTheme.titleLarge),
+                Text('settings.change_password_title'.tr(), style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _currentController,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Current password', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: 'settings.current_password'.tr(), border: const OutlineInputBorder()),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _newController,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'New password', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: 'settings.new_password'.tr(), border: const OutlineInputBorder()),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _confirmController,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Confirm new password', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: 'settings.confirm_new_password'.tr(), border: const OutlineInputBorder()),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
@@ -400,7 +400,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                   onPressed: _submitting ? null : _submit,
                   child: _submitting
                       ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Update password'),
+                      : Text('settings.update_password'.tr()),
                 ),
               ],
             ),
