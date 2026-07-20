@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:easy_localization/easy_localization.dart';
 /// Pure UI widget -- no business logic here.
 /// Parent (DashboardScreen) owns the selected index and passes it in,
 /// this widget only renders and reports taps back via [onTap].
@@ -25,26 +25,26 @@ class DashboardBottomNav extends StatelessWidget {
       elevation: 3,
       height: 68,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      destinations: const [
+      destinations: [
         NavigationDestination(
-          icon: Icon(Icons.auto_stories_outlined),
-          selectedIcon: Icon(Icons.auto_stories),
-          label: 'Story',
+          icon: const Icon(Icons.auto_stories_outlined),
+          selectedIcon: const Icon(Icons.auto_stories),
+          label: 'dashboard.story_tab'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.movie_creation_outlined),
-          selectedIcon: Icon(Icons.movie_creation),
-          label: 'Documentary',
+          icon: const Icon(Icons.movie_creation_outlined),
+          selectedIcon: const Icon(Icons.movie_creation),
+          label: 'dashboard.documentary_tab'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.history_outlined),
-          selectedIcon: Icon(Icons.history),
-          label: 'History',
+          icon: const Icon(Icons.history_outlined),
+          selectedIcon: const Icon(Icons.history),
+          label: 'dashboard.history_tab'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.workspace_premium_outlined),
-          selectedIcon: Icon(Icons.workspace_premium),
-          label: 'Subscription',
+          icon: const Icon(Icons.workspace_premium_outlined),
+          selectedIcon: const Icon(Icons.workspace_premium),
+          label: 'dashboard.subscription_tab'.tr(),
         ),
       ],
     );
