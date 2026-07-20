@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/documentary_model.dart';
-import 'package:my_app/data/dummy_documentaries.dart';
+import 'package:my_app/services/documentary_service.dart';
 import 'package:my_app/widgets/documentary/documentary_card.dart';
 import 'package:my_app/widgets/documentary/documentary_time_filter_bar.dart';
 import 'package:my_app/widgets/documentary/documentary_sort_menu.dart';
@@ -16,6 +16,9 @@ import 'package:my_app/widgets/documentary/documentary_sort_menu.dart';
 /// now; the moment the calendar date changes, the exact same
 /// addedAt value naturally falls into "Yesterday" / "This Week" on
 /// its own the next time the UI builds.
+///
+/// Documentaries now come from the backend (GET /documentaries)
+/// instead of dummy data.
 class DocumentaryTab extends StatefulWidget {
   const DocumentaryTab({super.key});
 
@@ -24,38 +27,54 @@ class DocumentaryTab extends StatefulWidget {
 }
 
 class _DocumentaryTabState extends State<DocumentaryTab> {
+  final _documentaryService = DocumentaryService();
+  late Future<List<DocumentaryModel>> _documentariesFuture;
+
   DocumentaryTimeFilter _timeFilter = DocumentaryTimeFilter.all;
   DocumentarySortOption _sort = DocumentarySortOption.popularity;
+
+  @override
+  void initState() {
+    super.initState();
+    _documentariesFuture = _documentaryService.fetchDocumentaries();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _documentariesFuture = _documentaryService.fetchDocumentaries();
+    });
+    await _documentariesFuture;
+  }
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  List<DocumentaryModel> get _timeFiltered {
+  List<DocumentaryModel> _timeFiltered(List<DocumentaryModel> documentaries) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
 
     switch (_timeFilter) {
       case DocumentaryTimeFilter.all:
-        return dummyDocumentaries;
+        return documentaries;
       case DocumentaryTimeFilter.today:
-        return dummyDocumentaries.where((d) => _isSameDay(d.addedAt, today)).toList();
+        return documentaries.where((d) => _isSameDay(d.addedAt, today)).toList();
       case DocumentaryTimeFilter.yesterday:
-        return dummyDocumentaries.where((d) => _isSameDay(d.addedAt, yesterday)).toList();
+        return documentaries.where((d) => _isSameDay(d.addedAt, yesterday)).toList();
       case DocumentaryTimeFilter.thisWeek:
         final weekStart = today.subtract(const Duration(days: 6));
-        return dummyDocumentaries.where((d) => !d.addedAt.isBefore(weekStart)).toList();
+        return documentaries.where((d) => !d.addedAt.isBefore(weekStart)).toList();
       case DocumentaryTimeFilter.thisMonth:
-        return dummyDocumentaries
+        return documentaries
             .where((d) => d.addedAt.year == now.year && d.addedAt.month == now.month)
             .toList();
       case DocumentaryTimeFilter.thisYear:
-        return dummyDocumentaries.where((d) => d.addedAt.year == now.year).toList();
+        return documentaries.where((d) => d.addedAt.year == now.year).toList();
     }
   }
 
-  List<DocumentaryModel> get _sorted {
-    final list = [..._timeFiltered];
+  List<DocumentaryModel> _sorted(List<DocumentaryModel> documentaries) {
+    final list = [...documentaries];
     switch (_sort) {
       case DocumentarySortOption.popularity:
         list.sort((a, b) => b.popularityScore.compareTo(a.popularityScore));
@@ -119,83 +138,113 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
 
   @override
   Widget build(BuildContext context) {
-    final documentaries = _sorted;
+    return FutureBuilder<List<DocumentaryModel>>(
+      future: _documentariesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(0, 16, 0, 10),
-          sliver: SliverToBoxAdapter(
-            child: Row(
-              children: [
-                DocumentarySortMenu(
-                  selected: _sort,
-                  onChanged: (sort) {
-                    setState(() {
-                      // Tapping the already-active sort option again
-                      // clears the filter back to the default (Popular).
-                      _sort = (sort == _sort) ? DocumentarySortOption.popularity : sort;
-                    });
-                  },
-                ),
-                Expanded(
-                  child: DocumentaryTimeFilterBar(
-                    selected: _timeFilter,
-                    onSelected: (filter) => setState(() => _timeFilter = filter),
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.cloud_off, size: 48, color: Theme.of(context).colorScheme.outline),
+                  const SizedBox(height: 12),
+                  Text('${snapshot.error}', textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  FilledButton(onPressed: _refresh, child: const Text('Retry')),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final documentaries = _sorted(_timeFiltered(snapshot.data ?? const []));
+
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(0, 16, 0, 10),
+                sliver: SliverToBoxAdapter(
+                  child: Row(
+                    children: [
+                      DocumentarySortMenu(
+                        selected: _sort,
+                        onChanged: (sort) {
+                          setState(() {
+                            // Tapping the already-active sort option again
+                            // clears the filter back to the default (Popular).
+                            _sort = (sort == _sort) ? DocumentarySortOption.popularity : sort;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: DocumentaryTimeFilterBar(
+                          selected: _timeFilter,
+                          onSelected: (filter) => setState(() => _timeFilter = filter),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-        if (documentaries.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.movie_creation_outlined,
-                      size: 56,
-                      color: Theme.of(context).colorScheme.outline,
+              ),
+              if (documentaries.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.movie_creation_outlined,
+                            size: 56,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'documentary.no_documentaries_filter'.tr(namedArgs: {'filter': _timeFilter.label}),
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'documentary.no_documentaries_filter'.tr(namedArgs: {'filter': _timeFilter.label}),
-                      style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.48,
                     ),
-                  ],
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final d = documentaries[index];
+                        return DocumentaryCard(
+                          documentary: d,
+                          statLabel: _statFor(d),
+                          statIcon: _statIcon,
+                        );
+                      },
+                      childCount: documentaries.length,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.48,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final d = documentaries[index];
-                  return DocumentaryCard(
-                    documentary: d,
-                    statLabel: _statFor(d),
-                    statIcon: _statIcon,
-                  );
-                },
-                childCount: documentaries.length,
-              ),
-            ),
+            ],
           ),
-      ],
+        );
+      },
     );
   }
 }
