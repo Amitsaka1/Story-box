@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/providers/auth_provider.dart';
 import 'package:my_app/providers/theme_provider.dart';
 
@@ -55,6 +56,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
+          // ---------------- Language (persisted via easy_localization) ----------------
+          _SectionTitle('Language'),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.language_outlined),
+              title: const Text('App language'),
+              subtitle: Text(_currentLanguageLabel(context)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showLanguagePicker(context),
+            ),
+          ),
+          const SizedBox(height: 20),
+          
           // ---------------- Notifications (LOCAL ONLY) ----------------
           _SectionTitle('Notifications'),
           Card(
