@@ -8,5 +8,20 @@
     "login_button": "Log in",
     "no_account": "Don't have an account? Register",
     "generic_error": "Login failed. Please try again."
+  },
+  "register": {
+    "title": "Register",
+    "heading": "Create a new account",
+    "username_label": "Username",
+    "username_required": "Username is required",
+    "username_invalid": "Username must be 3-20 characters, start with a letter, and contain only letters/numbers/underscore",
+    "password_label": "Password",
+    "password_min_length": "Password must be at least 10 characters",
+    "password_complexity": "Password must contain uppercase, lowercase, and a number",
+    "confirm_password_label": "Confirm Password",
+    "confirm_password_mismatch": "Passwords do not match",
+    "register_button": "Register",
+    "have_account": "Already have an account? Log in",
+    "success_message": "Account created! Please log in."
   }
 }
