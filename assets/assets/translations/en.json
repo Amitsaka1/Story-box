@@ -68,5 +68,13 @@
     "password_changed_success": "Password changed successfully.",
     "done": "Done",
     "change_password_generic_error": "Could not change password."
+  },
+  "dashboard": {
+    "story_tab": "Story",
+    "documentary_tab": "Documentary",
+    "history_tab": "History",
+    "subscription_tab": "Subscription",
+    "trending_tooltip": "Trending",
+    "settings_tooltip": "Settings"
   }
 }
