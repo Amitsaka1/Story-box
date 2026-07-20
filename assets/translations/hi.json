@@ -76,5 +76,26 @@
     "subscription_tab": "सब्सक्रिप्शन",
     "trending_tooltip": "ट्रेंडिंग",
     "settings_tooltip": "सेटिंग्स"
+  },
+  "story": {
+    "time_all": "सभी",
+    "time_today": "आज",
+    "time_yesterday": "कल",
+    "time_this_week": "इस सप्ताह",
+    "time_this_month": "इस महीने",
+    "time_this_year": "इस साल",
+    "category_all": "सभी",
+    "recently_added": "हाल ही में जोड़ी गई",
+    "watching": "देख रहे हैं",
+    "all_stories": "सभी कहानियां",
+    "no_stories_filter": "इस फ़िल्टर के लिए कोई कहानी नहीं मिली।",
+    "days_ago": "{count} दिन पहले",
+    "hours_ago": "{count} घंटे पहले",
+    "minutes_ago": "{count} मिनट पहले",
+    "percent_watched": "{percent}% देखा गया",
+    "see_all": "सभी देखें",
+    "top20_title": "टॉप 20",
+    "all_categories": "सभी श्रेणियां",
+    "no_stories_category": "\"{category}\" में अभी कोई कहानी नहीं है।"
   }
-  }
+}
