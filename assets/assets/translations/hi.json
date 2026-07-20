@@ -8,5 +8,20 @@
     "login_button": "लॉगिन",
     "no_account": "अकाउंट नहीं है? रजिस्टर करें",
     "generic_error": "लॉगिन नहीं हो पाया।"
+  },
+  "register": {
+    "title": "रजिस्टर",
+    "heading": "नया अकाउंट बनाएं",
+    "username_label": "यूज़रनेम",
+    "username_required": "यूज़रनेम डालना ज़रूरी है",
+    "username_invalid": "यूज़रनेम 3-20 अक्षरों का होना चाहिए, अक्षर से शुरू हो, और सिर्फ letters/numbers/underscore हों",
+    "password_label": "पासवर्ड",
+    "password_min_length": "पासवर्ड कम से कम 10 अक्षरों का होना चाहिए",
+    "password_complexity": "पासवर्ड में uppercase, lowercase, और एक number होना चाहिए",
+    "confirm_password_label": "पासवर्ड की पुष्टि करें",
+    "confirm_password_mismatch": "पासवर्ड मेल नहीं खा रहा",
+    "register_button": "रजिस्टर करें",
+    "have_account": "पहले से अकाउंट है? लॉगिन करें",
+    "success_message": "अकाउंट बन गया! अब लॉगिन करें।"
   }
 }
