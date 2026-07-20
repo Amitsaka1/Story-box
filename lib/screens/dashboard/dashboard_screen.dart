@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/widgets/dashboard/dashboard_app_bar.dart';
 import 'package:my_app/widgets/dashboard/dashboard_bottom_nav.dart';
+import 'package:my_app/screens/story/trending_screen.dart';
 import 'tabs/story_tab.dart';
 import 'tabs/documentary_tab.dart';
 import 'tabs/history_tab.dart';
@@ -32,10 +33,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _selectedIndex = index);
   }
 
+  void _openTrending() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const TrendingScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Trending icon only makes sense on the Story tab (index 0).
+    final isStoryTab = _selectedIndex == 0;
+
     return Scaffold(
-      appBar: DashboardAppBar(title: _titles[_selectedIndex]),
+      appBar: DashboardAppBar(
+        title: _titles[_selectedIndex],
+        onTrendingTap: isStoryTab ? _openTrending : null,
+      ),
       // IndexedStack keeps each tab's scroll position / state alive
       // when switching between tabs, instead of rebuilding from scratch.
       body: IndexedStack(
