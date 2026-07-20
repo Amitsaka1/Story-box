@@ -97,5 +97,23 @@
     "top20_title": "टॉप 20",
     "all_categories": "सभी श्रेणियां",
     "no_stories_category": "\"{category}\" में अभी कोई कहानी नहीं है।"
+  },
+  "documentary": {
+    "sort_popularity": "लोकप्रिय",
+    "sort_rating": "रेटिंग",
+    "sort_likes": "पसंद",
+    "sort_comments": "टिप्पणियां",
+    "sort_views": "व्यूज़",
+    "stat_popularity": "{rating} · {views} व्यूज़",
+    "stat_rating": "{rating} / 5.0",
+    "stat_likes": "{count} पसंद",
+    "stat_comments": "{count} टिप्पणियां",
+    "stat_views": "{count} व्यूज़",
+    "no_documentaries_filter": "\"{filter}\" में कोई डॉक्यूमेंट्री नहीं है"
+  },
+  "history": {
+    "recently_viewed": "हाल ही में देखी गई",
+    "no_history_title": "अभी कोई इतिहास नहीं है",
+    "no_history_subtitle": "आप जो पढ़ेंगे या देखेंगे वो यहां दिखेगा।"
   }
 }
