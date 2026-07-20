@@ -38,6 +38,24 @@ class StoryModel {
     this.watchProgress = 0.0,
   });
 
+  /// Maps the JSON shape returned by GET /stories. isWatching /
+  /// watchProgress aren't tracked by the backend yet (that needs a
+  /// per-user progress table), so they default to false/0.0 here --
+  /// swap this in once that endpoint exists.
+  factory StoryModel.fromJson(Map<String, dynamic> json) {
+    return StoryModel(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      coverImageUrl: json['coverImageUrl'] as String,
+      category: json['category'] as String,
+      rating: (json['rating'] as num).toDouble(),
+      viewCount: json['viewCount'] as int,
+      likeCount: json['likeCount'] as int,
+      commentCount: json['commentCount'] as int,
+      addedAt: DateTime.parse(json['addedAt'] as String),
+    );
+  }
+
   /// Compact display like "12K", "3.4M" for view/like/comment counts.
   static String formatCount(int count) {
     if (count >= 1000000) {
