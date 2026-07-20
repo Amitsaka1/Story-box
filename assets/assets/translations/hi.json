@@ -1,1 +1,12 @@
-{"app_name": "स्टोरी बॉक्स"}
+{
+  "app_name": "स्टोरी बॉक्स",
+  "login": {
+    "username_label": "यूज़रनेम",
+    "username_required": "यूज़रनेम डालना ज़रूरी है",
+    "password_label": "पासवर्ड",
+    "password_min_length": "पासवर्ड कम से कम 10 अक्षरों का होना चाहिए",
+    "login_button": "लॉगिन",
+    "no_account": "अकाउंट नहीं है? रजिस्टर करें",
+    "generic_error": "लॉगिन नहीं हो पाया।"
+  }
+}
