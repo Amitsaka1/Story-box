@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 /// The set of time buckets a story can fall into -- same pattern as
 /// DocumentaryTimeFilter, kept separate so each tab's filter logic
@@ -9,17 +10,17 @@ extension StoryTimeFilterLabel on StoryTimeFilter {
   String get label {
     switch (this) {
       case StoryTimeFilter.all:
-        return 'All';
+        return 'story.time_all'.tr();
       case StoryTimeFilter.today:
-        return 'Today';
+        return 'story.time_today'.tr();
       case StoryTimeFilter.yesterday:
-        return 'Yesterday';
+        return 'story.time_yesterday'.tr();
       case StoryTimeFilter.thisWeek:
-        return 'This Week';
+        return 'story.time_this_week'.tr();
       case StoryTimeFilter.thisMonth:
-        return 'This Month';
+        return 'story.time_this_month'.tr();
       case StoryTimeFilter.thisYear:
-        return 'This Year';
+        return 'story.time_this_year'.tr();
     }
   }
 }
