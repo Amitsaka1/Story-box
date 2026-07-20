@@ -156,24 +156,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
 
           // ---------------- Session (backend-connected) ----------------
-          _SectionTitle('Session'),
+          _SectionTitle('settings.session'.tr()),
           Card(
             child: ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('Log out'),
-              subtitle: const Text('Signing in on another device logs you out here automatically.'),
+              title: Text('settings.log_out'.tr()),
+              subtitle: Text('settings.log_out_note'.tr()),
               onTap: () => _confirmLogout(context),
             ),
           ),
           const SizedBox(height: 20),
 
           // ---------------- Danger zone ----------------
-          _SectionTitle('Danger zone'),
+          _SectionTitle('settings.danger_zone'.tr()),
           Card(
             child: ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Delete account', style: TextStyle(color: Colors.red)),
-              subtitle: const Text('Not available yet -- backend endpoint not built.'),
+              title: Text('settings.delete_account'.tr(), style: const TextStyle(color: Colors.red)),
+              subtitle: Text('settings.delete_account_note'.tr()),
               enabled: false,
             ),
           ),
