@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/providers/auth_provider.dart';
 import 'register_screen.dart';
 
@@ -35,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (!success && mounted) {
-      setState(() => _errorMessage = auth.lastError ?? 'Login fail ho gaya.');
+      setState(() => _errorMessage = auth.lastError ?? 'login.generic_error'.tr());
     }
   }
 
@@ -56,22 +57,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   const Icon(Icons.menu_book_rounded, size: 72, color: Colors.deepPurple),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Story Box',
+                  Text(
+                    'app_name'.tr(),
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 32),
                   TextFormField(
                     controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person_outline),
+                    decoration: InputDecoration(
+                      labelText: 'login.username_label'.tr(),
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.person_outline),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Username daalna zaroori hai';
+                        return 'login.username_required'.tr();
                       }
                       return null;
                     },
@@ -81,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      labelText: 'Password',
+                      labelText: 'login.password_label'.tr(),
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
@@ -91,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.length < 10) {
-                        return 'Password kam se kam 10 characters ka hona chahiye';
+                        return 'login.password_min_length'.tr();
                       }
                       return null;
                     },
@@ -110,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('Login'),
+                        : Text('login.login_button'.tr()),
                   ),
                   const SizedBox(height: 12),
                   TextButton(
@@ -120,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         MaterialPageRoute(builder: (context) => const RegisterScreen()),
                       );
                     },
-                    child: const Text('Account nahi hai? Register karo'),
+                    child: Text('login.no_account'.tr()),
                   ),
                 ],
               ),
