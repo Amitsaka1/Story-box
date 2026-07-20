@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/story_model.dart';
 import 'package:my_app/data/dummy_stories.dart';
 import 'package:my_app/widgets/story/story_card.dart';
@@ -55,9 +56,9 @@ class _StoryTabState extends State<StoryTab> {
 
   String _timeAgo(DateTime time) {
     final diff = DateTime.now().difference(time);
-    if (diff.inDays > 0) return '${diff.inDays}d ago';
-    if (diff.inHours > 0) return '${diff.inHours}h ago';
-    return '${diff.inMinutes}m ago';
+    if (diff.inDays > 0) return 'story.days_ago'.tr(namedArgs: {'count': '${diff.inDays}'});
+    if (diff.inHours > 0) return 'story.hours_ago'.tr(namedArgs: {'count': '${diff.inHours}'});
+    return 'story.minutes_ago'.tr(namedArgs: {'count': '${diff.inMinutes}'});
   }
 
   @override
@@ -102,7 +103,7 @@ class _StoryTabState extends State<StoryTab> {
         SliverList(
           delegate: SliverChildListDelegate([
             StorySection(
-              title: 'Recently Added',
+              title: 'story.recently_added'.tr(),
               titleIcon: Icons.fiber_new_outlined,
               stories: recentlyAdded,
               statIcon: Icons.schedule,
@@ -111,11 +112,13 @@ class _StoryTabState extends State<StoryTab> {
             ),
             const SizedBox(height: 24),
             StorySection(
-              title: 'Watching',
+              title: 'story.watching'.tr(),
               titleIcon: Icons.play_circle_outline,
               stories: watching,
               statIcon: Icons.hourglass_bottom,
-              statLabelBuilder: (s) => '${(s.watchProgress * 100).round()}% watched',
+              statLabelBuilder: (s) => 'story.percent_watched'.tr(
+                namedArgs: {'percent': '${(s.watchProgress * 100).round()}'},
+              ),
             ),
             const SizedBox(height: 8),
           ]),
@@ -124,7 +127,7 @@ class _StoryTabState extends State<StoryTab> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           sliver: SliverToBoxAdapter(
             child: Text(
-              _selectedCategory == kAllCategories ? 'All Stories' : _selectedCategory,
+              _selectedCategory == kAllCategories ? 'story.all_stories'.tr() : _selectedCategory,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
@@ -134,7 +137,7 @@ class _StoryTabState extends State<StoryTab> {
             hasScrollBody: false,
             child: Center(
               child: Text(
-                'No stories found for this filter.',
+                'story.no_stories_filter'.tr(),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
