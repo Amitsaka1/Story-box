@@ -97,5 +97,23 @@
     "top20_title": "Top 20",
     "all_categories": "All categories",
     "no_stories_category": "No stories in \"{category}\" yet."
+  },
+  "documentary": {
+    "sort_popularity": "Popular",
+    "sort_rating": "Rating",
+    "sort_likes": "Likes",
+    "sort_comments": "Comments",
+    "sort_views": "Views",
+    "stat_popularity": "{rating} · {views} views",
+    "stat_rating": "{rating} / 5.0",
+    "stat_likes": "{count} likes",
+    "stat_comments": "{count} comments",
+    "stat_views": "{count} views",
+    "no_documentaries_filter": "No documentaries in \"{filter}\""
+  },
+  "history": {
+    "recently_viewed": "Recently viewed",
+    "no_history_title": "No history yet",
+    "no_history_subtitle": "Things you read or watch will show up here."
   }
 }
