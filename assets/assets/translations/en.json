@@ -1,1 +1,12 @@
-{"app_name": "Story Box"}
+{
+  "app_name": "Story Box",
+  "login": {
+    "username_label": "Username",
+    "username_required": "Username is required",
+    "password_label": "Password",
+    "password_min_length": "Password must be at least 10 characters",
+    "login_button": "Log in",
+    "no_account": "Don't have an account? Register",
+    "generic_error": "Login failed. Please try again."
+  }
+}
