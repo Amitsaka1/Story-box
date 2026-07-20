@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 /// UI-only placeholder for the History tab (watch/read history).
 /// Same empty-state pattern as the other tabs -- wire to a real
@@ -16,7 +17,7 @@ class HistoryTab extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
           sliver: SliverToBoxAdapter(
             child: Text(
-              'Recently viewed',
+              'history.recently_viewed'.tr(),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -38,12 +39,12 @@ class HistoryTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No history yet',
+                    'history.no_history_title'.tr(),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Things you read or watch will show up here.',
+                    'history.no_history_subtitle'.tr(),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
