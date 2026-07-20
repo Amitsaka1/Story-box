@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:my_app/screens/settings_screen.dart';
 
 /// Pure UI widget -- shows the current section title on the left and a
-/// settings icon on the right. Tapping the icon pushes SettingsScreen on
-/// top of the dashboard, so the bottom nav / tab state stays intact
-/// underneath when the user comes back.
+/// settings icon on the right. Tapping the settings icon pushes
+/// SettingsScreen on top of the dashboard, so the bottom nav / tab
+/// state stays intact underneath when the user comes back.
+///
+/// [onTrendingTap] is optional -- when provided (only on the Story
+/// tab), a Trending icon is shown between the title and settings.
 class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final VoidCallback? onTrendingTap;
 
-  const DashboardAppBar({super.key, required this.title});
+  const DashboardAppBar({super.key, required this.title, this.onTrendingTap});
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +23,12 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       centerTitle: false,
       actions: [
+        if (onTrendingTap != null)
+          IconButton(
+            icon: const Icon(Icons.local_fire_department_outlined),
+            tooltip: 'Trending',
+            onPressed: onTrendingTap,
+          ),
         IconButton(
           icon: const Icon(Icons.settings_outlined),
           tooltip: 'Settings',
