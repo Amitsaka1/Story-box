@@ -178,6 +178,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  static const Map<String, String> _languageNames = {
+    'en': 'English',
+    'hi': 'हिन्दी',
+    'bn': 'বাংলা',
+    'ta': 'தமிழ்',
+    'te': 'తెలుగు',
+    'mr': 'मराठी',
+    'gu': 'ગુજરાતી',
+    'kn': 'ಕನ್ನಡ',
+    'ml': 'മലയാളം',
+    'pa': 'ਪੰਜਾਬੀ',
+    'ur': 'اردو',
+  };
+
+  String _currentLanguageLabel(BuildContext context) {
+    return _languageNames[context.locale.languageCode] ?? 'English';
+  }
+
+  void _showLanguagePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.smartphone),
+                title: const Text('System Default'),
+                onTap: () {
+                  context.resetLocale();
+                  Navigator.pop(sheetContext);
+                },
+              ),
+              const Divider(height: 1),
+              ..._languageNames.entries.map((entry) {
+                final code = entry.key;
+                final name = entry.value;
+                final isSelected = context.locale.languageCode == code;
+                return ListTile(
+                  title: Text(name),
+                  trailing: isSelected ? const Icon(Icons.check, color: Colors.green) : null,
+                  onTap: () {
+                    context.setLocale(Locale(code));
+                    Navigator.pop(sheetContext);
+                  },
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _confirmLogout(BuildContext context) {
     showDialog(
       context: context,
