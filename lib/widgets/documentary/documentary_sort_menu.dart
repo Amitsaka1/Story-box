@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:easy_localization/easy_localization.dart';
 /// The ways a documentary list can be sorted. "popularity" is the
 /// default (combined rating+like+comment+view score) used for "All".
 /// Treated as the "no filter applied" state -- the green dot only
@@ -10,15 +10,15 @@ extension DocumentarySortOptionLabel on DocumentarySortOption {
   String get label {
     switch (this) {
       case DocumentarySortOption.popularity:
-        return 'Popular';
+        return 'documentary.sort_popularity'.tr();
       case DocumentarySortOption.rating:
-        return 'Rating';
+        return 'documentary.sort_rating'.tr();
       case DocumentarySortOption.likes:
-        return 'Likes';
+        return 'documentary.sort_likes'.tr();
       case DocumentarySortOption.comments:
-        return 'Comments';
+        return 'documentary.sort_comments'.tr();
       case DocumentarySortOption.views:
-        return 'Views';
+        return 'documentary.sort_views'.tr();
     }
   }
 
