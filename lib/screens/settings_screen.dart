@@ -314,19 +314,19 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     setState(() => _error = null);
 
     if (_currentController.text.isEmpty) {
-      setState(() => _error = 'Enter your current password.');
+      setState(() => _error = 'settings.current_password_required'.tr());
       return;
     }
     if (_newController.text.length < 8) {
-      setState(() => _error = 'New password must be at least 8 characters.');
+      setState(() => _error = 'settings.new_password_min_length'.tr());
       return;
     }
     if (_newController.text == _currentController.text) {
-      setState(() => _error = 'New password must be different from the current one.');
+      setState(() => _error = 'settings.new_password_same_as_current'.tr());
       return;
     }
     if (_newController.text != _confirmController.text) {
-      setState(() => _error = 'New password and confirmation do not match.');
+      setState(() => _error = 'settings.new_password_mismatch'.tr());
       return;
     }
 
@@ -340,7 +340,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       if (ok) {
         _done = true;
       } else {
-        _error = context.read<AuthProvider>().lastError ?? 'Could not change password.';
+        _error = context.read<AuthProvider>().lastError ?? 'settings.change_password_generic_error'.tr();
       }
     });
   }
