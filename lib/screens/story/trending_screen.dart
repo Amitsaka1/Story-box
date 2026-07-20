@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/story_model.dart';
 import 'package:my_app/data/dummy_stories.dart';
 import 'package:my_app/widgets/story/story_card.dart';
@@ -33,7 +34,7 @@ class _TrendingScreenState extends State<TrendingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Top 20', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: Text('story.top20_title'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: CustomScrollView(
         slivers: [
@@ -48,7 +49,7 @@ class _TrendingScreenState extends State<TrendingScreen> {
                     onChanged: (category) => setState(() => _selectedCategory = category),
                   ),
                   Text(
-                    _selectedCategory == kAllCategories ? 'All categories' : _selectedCategory,
+                    _selectedCategory == kAllCategories ? 'story.all_categories'.tr() : _selectedCategory,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -62,7 +63,7 @@ class _TrendingScreenState extends State<TrendingScreen> {
               hasScrollBody: false,
               child: Center(
                 child: Text(
-                  'No stories in "$_selectedCategory" yet.',
+                  'story.no_stories_category'.tr(namedArgs: {'category': _selectedCategory}),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
