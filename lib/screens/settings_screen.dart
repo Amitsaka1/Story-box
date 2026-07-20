@@ -210,7 +210,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.smartphone),
-                title: const Text('System Default'),
+                title: Text('settings.system_default'.tr()),
                 onTap: () {
                   context.resetLocale();
                   Navigator.pop(sheetContext);
@@ -241,10 +241,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text("You'll need to log in again to access your account."),
+        title: Text('settings.log_out_confirm_title'.tr()),
+        content: Text('settings.log_out_confirm_body'.tr()),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('settings.cancel'.tr())),
           FilledButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
@@ -252,13 +252,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Your root widget should watch AuthProvider.isLoggedIn and
               // swap to the login screen automatically when it goes false.
             },
-            child: const Text('Log out'),
+            child: Text('settings.log_out'.tr()),
           ),
         ],
       ),
     );
   }
-
   void _showChangePasswordSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
