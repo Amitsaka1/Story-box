@@ -45,13 +45,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
 
           // ---------------- Appearance (persisted via ThemeProvider) ----------------
-          _SectionTitle('Appearance'),
+          _SectionTitle('settings.appearance'.tr()),
           Card(
             child: Column(
               children: [
                 SwitchListTile(
                   secondary: const Icon(Icons.dark_mode_outlined),
-                  title: const Text('Dark mode'),
+                  title: Text('settings.dark_mode'.tr()),
                   value: themeProvider.isDarkMode,
                   onChanged: (v) => context.read<ThemeProvider>().setDarkMode(v),
                 ),
@@ -61,11 +61,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
 
           // ---------------- Language (persisted via easy_localization) ----------------
-          _SectionTitle('Language'),
+          _SectionTitle('settings.language'.tr()),
           Card(
             child: ListTile(
               leading: const Icon(Icons.language_outlined),
-              title: const Text('App language'),
+              title: Text('settings.app_language'.tr()),
               subtitle: Text(_currentLanguageLabel(context)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showLanguagePicker(context),
