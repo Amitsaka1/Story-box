@@ -21,6 +21,20 @@ class DocumentaryModel {
     required this.addedAt,
   });
 
+  /// Maps the JSON shape returned by GET /documentaries.
+  factory DocumentaryModel.fromJson(Map<String, dynamic> json) {
+    return DocumentaryModel(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      coverImageUrl: json['coverImageUrl'] as String,
+      rating: (json['rating'] as num).toDouble(),
+      viewCount: json['viewCount'] as int,
+      likeCount: json['likeCount'] as int,
+      commentCount: json['commentCount'] as int,
+      addedAt: DateTime.parse(json['addedAt'] as String),
+    );
+  }
+
   /// Compact display like "12K", "3.4M" for view/like/comment counts.
   static String formatCount(int count) {
     if (count >= 1000000) {
