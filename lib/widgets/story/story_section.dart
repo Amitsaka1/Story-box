@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/story_model.dart';
 import 'story_card.dart';
 import 'auto_scroll_story_list.dart';
@@ -63,7 +64,7 @@ class StorySection extends StatelessWidget {
               if (onSeeAll != null)
                 TextButton(
                   onPressed: onSeeAll,
-                  child: const Text('See all'),
+                  child: Text('story.see_all'.tr()),
                 ),
             ],
           ),
