@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/data/dummy_documentaries.dart';
 import 'package:my_app/widgets/documentary/documentary_card.dart';
@@ -78,15 +79,26 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
   String _statFor(DocumentaryModel d) {
     switch (_sort) {
       case DocumentarySortOption.popularity:
-        return '${d.rating.toStringAsFixed(1)} · ${DocumentaryModel.formatCount(d.viewCount)} views';
+        return 'documentary.stat_popularity'.tr(namedArgs: {
+          'rating': d.rating.toStringAsFixed(1),
+          'views': DocumentaryModel.formatCount(d.viewCount),
+        });
       case DocumentarySortOption.rating:
-        return '${d.rating.toStringAsFixed(1)} / 5.0';
+        return 'documentary.stat_rating'.tr(namedArgs: {
+          'rating': d.rating.toStringAsFixed(1),
+        });
       case DocumentarySortOption.likes:
-        return '${DocumentaryModel.formatCount(d.likeCount)} likes';
+        return 'documentary.stat_likes'.tr(namedArgs: {
+          'count': DocumentaryModel.formatCount(d.likeCount),
+        });
       case DocumentarySortOption.comments:
-        return '${DocumentaryModel.formatCount(d.commentCount)} comments';
+        return 'documentary.stat_comments'.tr(namedArgs: {
+          'count': DocumentaryModel.formatCount(d.commentCount),
+        });
       case DocumentarySortOption.views:
-        return '${DocumentaryModel.formatCount(d.viewCount)} views';
+        return 'documentary.stat_views'.tr(namedArgs: {
+          'count': DocumentaryModel.formatCount(d.viewCount),
+        });
     }
   }
 
