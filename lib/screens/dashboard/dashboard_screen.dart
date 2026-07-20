@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/widgets/dashboard/dashboard_app_bar.dart';
 import 'package:my_app/widgets/dashboard/dashboard_bottom_nav.dart';
 import 'package:my_app/screens/story/trending_screen.dart';
@@ -20,8 +21,13 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
-  static const _titles = ['Story', 'Documentary', 'History', 'Subscription'];
-
+  List<String> get _titles => [
+        'dashboard.story_tab'.tr(),
+        'dashboard.documentary_tab'.tr(),
+        'dashboard.history_tab'.tr(),
+        'dashboard.subscription_tab'.tr(),
+      ];
+  
   static const _tabs = [
     StoryTab(),
     DocumentaryTab(),
