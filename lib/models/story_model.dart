@@ -38,11 +38,12 @@ class StoryModel {
     this.watchProgress = 0.0,
   });
 
-  /// Maps the JSON shape returned by GET /stories. isWatching /
-  /// watchProgress aren't tracked by the backend yet (that needs a
-  /// per-user progress table), so they default to false/0.0 here --
-  /// swap this in once that endpoint exists.
+  /// Maps the JSON shape returned by GET /stories (list/detail) and
+  /// GET /stories/watching. The watching endpoint additionally sends
+  /// a `watchProgress` field -- when present, isWatching is derived
+  /// from it automatically (list/detail responses simply omit it).
   factory StoryModel.fromJson(Map<String, dynamic> json) {
+    final watchProgress = json['watchProgress'] != null ? (json['watchProgress'] as num).toDouble() : 0.0;
     return StoryModel(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -53,6 +54,8 @@ class StoryModel {
       likeCount: json['likeCount'] as int,
       commentCount: json['commentCount'] as int,
       addedAt: DateTime.parse(json['addedAt'] as String),
+      isWatching: json['watchProgress'] != null,
+      watchProgress: watchProgress,
     );
   }
 
