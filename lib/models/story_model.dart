@@ -4,6 +4,7 @@ class StoryModel {
   final String id;
   final String title;
   final String coverImageUrl;
+  final String contentUrl;
   final String category;
   final double rating; // 0.0 - 5.0
   final int viewCount;
@@ -28,6 +29,7 @@ class StoryModel {
     required this.id,
     required this.title,
     required this.coverImageUrl,
+    required this.contentUrl,
     required this.category,
     required this.rating,
     required this.viewCount,
@@ -48,6 +50,7 @@ class StoryModel {
       id: json['id'] as String,
       title: json['title'] as String,
       coverImageUrl: json['coverImageUrl'] as String,
+      contentUrl: json['contentUrl'] as String? ?? '',
       category: json['category'] as String,
       rating: (json['rating'] as num).toDouble(),
       viewCount: json['viewCount'] as int,
