@@ -1,19 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:my_app/models/story_content_model.dart';
 import 'package:my_app/models/story_interaction_model.dart';
 import 'package:my_app/models/story_model.dart';
 import 'package:my_app/services/story_service.dart';
 
-/// Story detail screen -- opens when a card is tapped anywhere in the
-/// app (dashboard sections/grid, trending list). Three things happen
-/// automatically here, no admin/DB work involved:
-///
-///   1. A view is registered once per user (backend dedupes it).
-///   2. Like/rating are live, tap-to-toggle / tap-a-star.
-///   3. Progress is a manual slider (there's no audio/video file field
-///      on Story yet, so there's nothing to auto-track playback
-///      position from) -- dragging it saves automatically on release.
-///      "Start Reading" / "Mark as Finished" cover the common cases
-///      without needing the slider at all.
 class StoryDetailScreen extends StatefulWidget {
   final String storyId;
 
@@ -27,7 +17,7 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
   final _storyService = StoryService();
 
   late Future<_DetailData> _dataFuture;
-  double? _pendingProgress; // local slider value while dragging
+  double? _pendingProgress;
 
   @override
   void initState() {
@@ -38,20 +28,38 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
   Future<_DetailData> _load() async {
     final story = await _storyService.fetchStoryById(widget.storyId);
     final interactions = await _storyService.fetchInteractions(widget.storyId);
-    // Fire-and-forget-ish: registers the view, but we still await it so
-    // the viewCount shown on screen is accurate the first time you open it.
     final viewCount = await _storyService.registerView(widget.storyId);
-    return _DetailData(story: story, interactions: interactions, liveViewCount: viewCount);
+
+    // Content fetch alag try/catch me -- agar CDN file missing/purani
+    // story me contentUrl na ho, poora screen crash nahi hona chahiye,
+    // bas "text load nahi ho paya" dikhna chahiye.
+    StoryContentModel? content;
+    String? contentError;
+    if (story.contentUrl.isNotEmpty) {
+      try {
+        content = await _storyService.fetchStoryContent(story.contentUrl);
+      } catch (e) {
+        contentError = '$e';
+      }
+    } else {
+      contentError = 'Is story ke liye abhi text add nahi hua hai.';
+    }
+
+    return _DetailData(
+      story: story,
+      interactions: interactions,
+      liveViewCount: viewCount,
+      content: content,
+      contentError: contentError,
+    );
   }
 
   Future<void> _toggleLike(_DetailData data) async {
     try {
       final result = await _storyService.toggleLike(widget.storyId);
       setState(() {
-        _dataFuture = Future.value(_DetailData(
-          story: data.story,
+        _dataFuture = Future.value(data.copyWith(
           interactions: data.interactions.copyWith(isLiked: result.liked),
-          liveViewCount: data.liveViewCount,
           liveLikeCount: result.likeCount,
         ));
       });
@@ -65,11 +73,8 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
     try {
       final avg = await _storyService.rateStory(widget.storyId, stars);
       setState(() {
-        _dataFuture = Future.value(_DetailData(
-          story: data.story,
+        _dataFuture = Future.value(data.copyWith(
           interactions: data.interactions.copyWith(myRating: stars),
-          liveViewCount: data.liveViewCount,
-          liveLikeCount: data.liveLikeCount,
           liveRating: avg,
         ));
       });
@@ -84,12 +89,8 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
       await _storyService.updateProgress(widget.storyId, progress);
       setState(() {
         _pendingProgress = null;
-        _dataFuture = Future.value(_DetailData(
-          story: data.story,
+        _dataFuture = Future.value(data.copyWith(
           interactions: data.interactions.copyWith(progress: progress, completed: progress >= 0.98),
-          liveViewCount: data.liveViewCount,
-          liveLikeCount: data.liveLikeCount,
-          liveRating: data.liveRating,
         ));
       });
     } catch (e) {
@@ -197,8 +198,6 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // Like + rate row
                     Row(
                       children: [
                         FilledButton.tonalIcon(
@@ -224,8 +223,6 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: 28),
-
-                    // Progress
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -265,6 +262,38 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                         ),
                       ],
                     ),
+
+                    // ---------------- Story text (yahi neeche padhne wala part) ----------------
+                    const SizedBox(height: 32),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Text('Story', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 16),
+                    if (data.content != null)
+                      ...data.content!.chapters.map(
+                        (chapter) => Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Chapter ${chapter.chapterNo}',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                chapter.text,
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        data.contentError ?? 'Text load nahi ho paya.',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
                   ]),
                 ),
               ),
@@ -282,6 +311,8 @@ class _DetailData {
   final int liveViewCount;
   final int? liveLikeCount;
   final double? liveRating;
+  final StoryContentModel? content;
+  final String? contentError;
 
   const _DetailData({
     required this.story,
@@ -289,5 +320,23 @@ class _DetailData {
     required this.liveViewCount,
     this.liveLikeCount,
     this.liveRating,
+    this.content,
+    this.contentError,
   });
+
+  _DetailData copyWith({
+    StoryInteractionModel? interactions,
+    int? liveLikeCount,
+    double? liveRating,
+  }) {
+    return _DetailData(
+      story: story,
+      interactions: interactions ?? this.interactions,
+      liveViewCount: liveViewCount,
+      liveLikeCount: liveLikeCount ?? this.liveLikeCount,
+      liveRating: liveRating ?? this.liveRating,
+      content: content,
+      contentError: contentError,
+    );
+  }
 }
