@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:my_app/providers/auth_provider.dart';
+import 'package:my_app/screens/admin/add_content_screen.dart';
 import 'package:my_app/widgets/dashboard/dashboard_app_bar.dart';
 import 'package:my_app/widgets/dashboard/dashboard_bottom_nav.dart';
 import 'package:my_app/screens/story/trending_screen.dart';
@@ -45,10 +48,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openAddContent() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AddContentScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Trending icon only makes sense on the Story tab (index 0).
     final isStoryTab = _selectedIndex == 0;
+
+    // Add-content FAB only shows for admins, and only on the Story /
+    // Documentary tabs (index 0/1) -- it doesn't make sense on
+    // History or Subscription.
+    final isAdmin = context.watch<AuthProvider>().currentUser?.isAdmin ?? false;
+    final isContentTab = _selectedIndex == 0 || _selectedIndex == 1;
 
     return Scaffold(
       appBar: DashboardAppBar(
@@ -61,6 +76,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         index: _selectedIndex,
         children: _tabs,
       ),
+      floatingActionButton: (isAdmin && isContentTab)
+          ? FloatingActionButton.extended(
+              onPressed: _openAddContent,
+              icon: const Icon(Icons.add),
+              label: const Text('Add'),
+            )
+          : null,
       bottomNavigationBar: DashboardBottomNav(
         currentIndex: _selectedIndex,
         onTap: _onTabSelected,
