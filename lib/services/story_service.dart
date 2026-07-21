@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:my_app/core/api_client.dart';
 import 'package:my_app/models/category_model.dart';
+import 'package:my_app/models/story_content_model.dart';
 import 'package:my_app/models/story_interaction_model.dart';
 import 'package:my_app/models/story_model.dart';
 
@@ -51,6 +52,7 @@ class StoryService {
   Future<StoryModel> addStory({
     required String title,
     required String coverImageUrl,
+    required String contentUrl,
     required String categoryId,
     double rating = 0,
     int viewCount = 0,
@@ -61,6 +63,7 @@ class StoryService {
       final res = await _dio.post('/stories', data: {
         'title': title,
         'coverImageUrl': coverImageUrl,
+        'contentUrl': contentUrl,
         'categoryId': categoryId,
         'rating': rating,
         'viewCount': viewCount,
@@ -73,6 +76,18 @@ class StoryService {
     }
   }
 
+  /// Story ka actual text seedha CDN se fetch karta hai -- backend
+  /// (_dio, jispe auth token attach hota hai) use nahi karta, kyunki
+  /// ye ek alag public CDN domain hai, apna backend nahi.
+  Future<StoryContentModel> fetchStoryContent(String contentUrl) async {
+    try {
+      final plainDio = Dio();
+      final res = await plainDio.get(contentUrl);
+      return StoryContentModel.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (_) {
+      throw 'Could not load the story text.';
+    }
+  }
   /// Single story by id -- used by the story detail screen.
   Future<StoryModel> fetchStoryById(String id) async {
     try {
