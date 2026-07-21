@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:my_app/core/api_client.dart';
 import 'package:my_app/models/category_model.dart';
+import 'package:my_app/models/story_interaction_model.dart';
 import 'package:my_app/models/story_model.dart';
 
 class StoryService {
@@ -69,6 +70,81 @@ class StoryService {
       return StoryModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _extractError(e, 'Could not create story.');
+    }
+  }
+
+  /// Single story by id -- used by the story detail screen.
+  Future<StoryModel> fetchStoryById(String id) async {
+    try {
+      final res = await _dio.get('/stories/$id');
+      return StoryModel.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load this story.');
+    }
+  }
+
+  /// Stories the current user has started but not finished, most
+  /// recently watched first -- powers the "Watching" section directly.
+  Future<List<StoryModel>> fetchWatching() async {
+    try {
+      final res = await _dio.get('/stories/watching');
+      final list = res.data as List;
+      return list.map((json) => StoryModel.fromJson(json as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load your watching list.');
+    }
+  }
+
+  /// The current user's personal state (liked / rating / progress) for
+  /// one story. Requires login.
+  Future<StoryInteractionModel> fetchInteractions(String storyId) async {
+    try {
+      final res = await _dio.get('/stories/$storyId/interactions');
+      return StoryInteractionModel.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load your activity for this story.');
+    }
+  }
+
+  /// Registers that the current user opened this story. Safe to call
+  /// every time the detail screen opens -- the backend only increments
+  /// the aggregate viewCount once per user, so this never double-counts.
+  Future<int> registerView(String storyId) async {
+    try {
+      final res = await _dio.post('/stories/$storyId/view');
+      return res.data['viewCount'] as int;
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not register the view.');
+    }
+  }
+
+  /// Toggles like on/off for the current user. Returns the new state.
+  Future<({bool liked, int likeCount})> toggleLike(String storyId) async {
+    try {
+      final res = await _dio.post('/stories/$storyId/like');
+      return (liked: res.data['liked'] as bool, likeCount: res.data['likeCount'] as int);
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not update like.');
+    }
+  }
+
+  /// Sets/updates the current user's 1-5 rating. Returns the story's
+  /// new overall average rating.
+  Future<double> rateStory(String storyId, int rating) async {
+    try {
+      final res = await _dio.put('/stories/$storyId/rating', data: {'rating': rating});
+      return (res.data['rating'] as num).toDouble();
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not save your rating.');
+    }
+  }
+
+  /// Saves watch/read progress (0.0 - 1.0) for the current user.
+  Future<void> updateProgress(String storyId, double progress) async {
+    try {
+      await _dio.put('/stories/$storyId/progress', data: {'progress': progress});
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not save your progress.');
     }
   }
 }
