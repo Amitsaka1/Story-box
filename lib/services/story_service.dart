@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:my_app/core/api_client.dart';
 import 'package:my_app/models/category_model.dart';
@@ -49,27 +51,24 @@ class StoryService {
   }
 
   /// Admin only -- backend rejects this with 403 for non-admin users.
+  /// title/categoryId text fields ki tarah, lekin cover ek image file
+  /// (bytes) hai aur chapters ek list -- backend khud R2 pe upload
+  /// karke JSON + image ke CDN URLs banata hai.
   Future<StoryModel> addStory({
     required String title,
-    required String coverImageUrl,
-    required String contentUrl,
     required String categoryId,
-    double rating = 0,
-    int viewCount = 0,
-    int likeCount = 0,
-    int commentCount = 0,
+    required List<Map<String, dynamic>> chapters,
+    required Uint8List coverBytes,
+    required String coverFilename,
   }) async {
     try {
-      final res = await _dio.post('/stories', data: {
+      final formData = FormData.fromMap({
         'title': title,
-        'coverImageUrl': coverImageUrl,
-        'contentUrl': contentUrl,
         'categoryId': categoryId,
-        'rating': rating,
-        'viewCount': viewCount,
-        'likeCount': likeCount,
-        'commentCount': commentCount,
+        'chapters': jsonEncode(chapters),
+        'cover': MultipartFile.fromBytes(coverBytes, filename: coverFilename),
       });
+      final res = await _dio.post('/stories', data: formData);
       return StoryModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _extractError(e, 'Could not create story.');
