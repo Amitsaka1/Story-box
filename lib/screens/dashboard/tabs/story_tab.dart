@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/story_model.dart';
+import 'package:my_app/screens/story/story_detail_screen.dart';
 import 'package:my_app/services/story_service.dart';
 import 'package:my_app/widgets/story/story_card.dart';
 import 'package:my_app/widgets/story/story_section.dart';
 import 'package:my_app/widgets/story/story_category_filter_menu.dart';
 import 'package:my_app/widgets/story/story_time_filter_bar.dart';
 
-/// Story dashboard: category icon-filter + time chips up top, then
-/// "Recently Added" and "Watching" horizontal sections, then every
-/// matching story in a 3-column grid underneath. Trending has moved
-/// to its own full "Top 20" screen (see TrendingScreen), reached via
-/// the app bar icon -- it's no longer a section on this page.
-///
-/// Stories now come from the backend (GET /stories) instead of dummy
-/// data -- fetched once on load and kept in memory, with the same
-/// on-device category/time filtering and sorting as before.
+
 class StoryTab extends StatefulWidget {
   const StoryTab({super.key});
 
@@ -26,6 +19,7 @@ class StoryTab extends StatefulWidget {
 class _StoryTabState extends State<StoryTab> {
   final _storyService = StoryService();
   late Future<List<StoryModel>> _storiesFuture;
+  late Future<List<StoryModel>> _watchingFuture;
 
   String _selectedCategory = kAllCategories;
   StoryTimeFilter _timeFilter = StoryTimeFilter.all;
@@ -34,13 +28,23 @@ class _StoryTabState extends State<StoryTab> {
   void initState() {
     super.initState();
     _storiesFuture = _storyService.fetchStories();
+    _watchingFuture = _storyService.fetchWatching();
   }
 
   Future<void> _refresh() async {
     setState(() {
       _storiesFuture = _storyService.fetchStories();
+      _watchingFuture = _storyService.fetchWatching();
     });
-    await _storiesFuture;
+    await Future.wait([_storiesFuture, _watchingFuture]);
+  }
+
+  void _openStory(StoryModel story) {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => StoryDetailScreen(storyId: story.id)))
+        // Refresh when coming back -- the user may have liked/rated/
+        // progressed the story, which should reflect immediately.
+        .then((_) => _refresh());
   }
 
   bool _isSameDay(DateTime a, DateTime b) =>
@@ -91,12 +95,12 @@ class _StoryTabState extends State<StoryTab> {
   Widget build(BuildContext context) {
     return FutureBuilder<List<StoryModel>>(
       future: _storiesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+      builder: (context, storiesSnapshot) {
+        if (storiesSnapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (snapshot.hasError) {
+        if (storiesSnapshot.hasError) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -105,7 +109,7 @@ class _StoryTabState extends State<StoryTab> {
                 children: [
                   Icon(Icons.cloud_off, size: 48, color: Theme.of(context).colorScheme.outline),
                   const SizedBox(height: 12),
-                  Text('${snapshot.error}', textAlign: TextAlign.center),
+                  Text('${storiesSnapshot.error}', textAlign: TextAlign.center),
                   const SizedBox(height: 12),
                   FilledButton(onPressed: _refresh, child: const Text('Retry')),
                 ],
@@ -114,20 +118,15 @@ class _StoryTabState extends State<StoryTab> {
           );
         }
 
-        final stories = snapshot.data ?? const [];
+        final stories = storiesSnapshot.data ?? const [];
 
-        // "Recently Added" and "Watching" always reflect the full library
-        // (not the category/time filter below) -- they're quick-access
-        // shelves, not part of the filtered browse experience.
+        // "Recently Added" reflects the full library (not the
+        // category/time filter below) -- it's a quick-access shelf,
+        // not part of the filtered browse experience.
         final recentlyAdded = stories
             .where((s) => DateTime.now().difference(s.addedAt) <= const Duration(hours: 24))
             .toList()
           ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
-
-        // Watch progress isn't tracked by the backend yet, so this
-        // section will be empty until a per-user progress endpoint
-        // exists -- kept here so it comes back automatically once it does.
-        final watching = stories.where((s) => s.isWatching).toList();
 
         // The grid below respects both filters.
         final gridStories = [..._timeAndCategoryFiltered(stories)]
@@ -167,16 +166,26 @@ class _StoryTabState extends State<StoryTab> {
                     statIcon: Icons.schedule,
                     statLabelBuilder: (s) => _timeAgo(s.addedAt),
                     autoScroll: true,
+                    onStoryTap: _openStory,
                   ),
                   const SizedBox(height: 24),
-                  StorySection(
-                    title: 'story.watching'.tr(),
-                    titleIcon: Icons.play_circle_outline,
-                    stories: watching,
-                    statIcon: Icons.hourglass_bottom,
-                    statLabelBuilder: (s) => 'story.percent_watched'.tr(
-                      namedArgs: {'percent': '${(s.watchProgress * 100).round()}'},
-                    ),
+                  FutureBuilder<List<StoryModel>>(
+                    future: _watchingFuture,
+                    builder: (context, watchingSnapshot) {
+                      // Errors here shouldn't block the whole tab --
+                      // just show nothing until it succeeds.
+                      final watching = watchingSnapshot.data ?? const [];
+                      return StorySection(
+                        title: 'story.watching'.tr(),
+                        titleIcon: Icons.play_circle_outline,
+                        stories: watching,
+                        statIcon: Icons.hourglass_bottom,
+                        statLabelBuilder: (s) => 'story.percent_watched'.tr(
+                          namedArgs: {'percent': '${(s.watchProgress * 100).round()}'},
+                        ),
+                        onStoryTap: _openStory,
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
                 ]),
@@ -219,6 +228,7 @@ class _StoryTabState extends State<StoryTab> {
                           story: story,
                           statLabel: '${story.rating.toStringAsFixed(1)} / 5.0',
                           statIcon: Icons.star,
+                          onTap: () => _openStory(story),
                         );
                       },
                       childCount: gridStories.length,
