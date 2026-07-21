@@ -1,19 +1,17 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:my_app/models/category_model.dart';
 import 'package:my_app/services/documentary_service.dart';
 import 'package:my_app/services/story_service.dart';
 
 enum _ContentType { story, documentary }
 
-/// Admin-only screen to add new content. Flow is deliberately minimal:
-/// pick Story or Documentary, then --
-///   Story -> just pick an existing category from a dropdown (or add a
-///            new one inline if none exist yet) -- the story gets
-///            created directly under that category.
-///   Documentary -> no category needed, it's a standalone list.
-/// Title + cover image URL are the only other fields; everything else
-/// (rating/views/likes/comments) defaults to 0 on the backend and can
-/// be edited later once an edit screen exists.
+/// Admin-only screen to add new content.
+///   Story -> category select + title + cover image (file) + chapters
+///            (text, ek ya zyada) -- backend khud R2 pe upload karke
+///            JSON + image URLs banata hai.
+///   Documentary -> abhi bhi URL-based hai (alag flow, chhua nahi).
 class AddContentScreen extends StatefulWidget {
   const AddContentScreen({super.key});
 
@@ -27,8 +25,13 @@ class _AddContentScreenState extends State<AddContentScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _titleController = TextEditingController();
-  final _coverUrlController = TextEditingController();
-  final _contentUrlController = TextEditingController();
+  final _coverUrlController = TextEditingController(); // documentary ke liye hi ab
+
+  final _picker = ImagePicker();
+  Uint8List? _coverBytes;
+  String? _coverFilename;
+
+  final List<TextEditingController> _chapterControllers = [TextEditingController()];
 
   _ContentType _type = _ContentType.story;
   late Future<List<CategoryModel>> _categoriesFuture;
@@ -45,8 +48,32 @@ class _AddContentScreenState extends State<AddContentScreen> {
   void dispose() {
     _titleController.dispose();
     _coverUrlController.dispose();
-    _contentUrlController.dispose();
+    for (final c in _chapterControllers) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> _pickCoverImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() {
+      _coverBytes = bytes;
+      _coverFilename = picked.name;
+    });
+  }
+
+  void _addChapterField() {
+    setState(() => _chapterControllers.add(TextEditingController()));
+  }
+
+  void _removeChapterField(int index) {
+    if (_chapterControllers.length == 1) return; // kam se kam 1 chapter rehna chahiye
+    setState(() {
+      _chapterControllers[index].dispose();
+      _chapterControllers.removeAt(index);
+    });
   }
 
   Future<void> _refreshCategories({CategoryModel? autoSelect}) async {
@@ -101,21 +128,42 @@ class _AddContentScreenState extends State<AddContentScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_type == _ContentType.story && _selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category.')),
-      );
-      return;
+
+    if (_type == _ContentType.story) {
+      if (_selectedCategory == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a category.')),
+        );
+        return;
+      }
+      if (_coverBytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please pick a cover image.')),
+        );
+        return;
+      }
+      final hasEmptyChapter = _chapterControllers.any((c) => c.text.trim().isEmpty);
+      if (hasEmptyChapter) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Every chapter needs some text.')),
+        );
+        return;
+      }
     }
 
     setState(() => _submitting = true);
     try {
       if (_type == _ContentType.story) {
+        final chapters = List.generate(
+          _chapterControllers.length,
+          (i) => {'chapterNo': i + 1, 'text': _chapterControllers[i].text.trim()},
+        );
         await _storyService.addStory(
           title: _titleController.text.trim(),
-          coverImageUrl: _coverUrlController.text.trim(),
-          contentUrl: _contentUrlController.text.trim(),
           categoryId: _selectedCategory!.id,
+          chapters: chapters,
+          coverBytes: _coverBytes!,
+          coverFilename: _coverFilename!,
         );
       } else {
         await _documentaryService.addDocumentary(
@@ -134,8 +182,17 @@ class _AddContentScreenState extends State<AddContentScreen> {
       );
       _titleController.clear();
       _coverUrlController.clear();
-      _contentUrlController.clear();
-      setState(() => _selectedCategory = null);
+      setState(() {
+        _coverBytes = null;
+        _coverFilename = null;
+        for (final c in _chapterControllers) {
+          c.dispose();
+        }
+        _chapterControllers
+          ..clear()
+          ..add(TextEditingController());
+        _selectedCategory = null;
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -182,13 +239,10 @@ class _AddContentScreenState extends State<AddContentScreen> {
                       child: LinearProgressIndicator(),
                     );
                   }
-
                   if (snapshot.hasError) {
                     return Text('Could not load categories: ${snapshot.error}');
                   }
-
                   final categories = snapshot.data ?? const [];
-
                   return Row(
                     children: [
                       Expanded(
@@ -218,37 +272,84 @@ class _AddContentScreenState extends State<AddContentScreen> {
               const SizedBox(height: 20),
             ],
             TextFormField(
-              controller: _coverUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Cover image URL',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.url,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Cover image URL is required.';
-                final uri = Uri.tryParse(v.trim());
-                if (uri == null || !uri.hasScheme) return 'Enter a valid URL.';
-                return null;
-              },
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required.' : null,
             ),
+            const SizedBox(height: 16),
+
             if (_type == _ContentType.story) ...[
-              const SizedBox(height: 16),
+              // ---------------- Cover image picker ----------------
+              Text('Cover image', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              if (_coverBytes != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(_coverBytes!, height: 160, fit: BoxFit.cover, width: double.infinity),
+                ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _pickCoverImage,
+                icon: const Icon(Icons.image_outlined),
+                label: Text(_coverBytes == null ? 'Pick cover image' : 'Change cover image'),
+              ),
+              const SizedBox(height: 24),
+
+              // ---------------- Chapters ----------------
+              Text('Story text (chapters)', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              ...List.generate(_chapterControllers.length, (i) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('Chapter ${i + 1}', style: Theme.of(context).textTheme.bodyMedium),
+                          const Spacer(),
+                          if (_chapterControllers.length > 1)
+                            IconButton(
+                              onPressed: () => _removeChapterField(i),
+                              icon: const Icon(Icons.close, size: 18),
+                              tooltip: 'Remove chapter',
+                            ),
+                        ],
+                      ),
+                      TextFormField(
+                        controller: _chapterControllers[i],
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          hintText: 'Chapter ka text yahan likho...',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              OutlinedButton.icon(
+                onPressed: _addChapterField,
+                icon: const Icon(Icons.add),
+                label: const Text('Add chapter'),
+              ),
+            ] else ...[
               TextFormField(
-                controller: _contentUrlController,
+                controller: _coverUrlController,
                 decoration: const InputDecoration(
-                  labelText: 'Content URL (R2/CDN JSON link)',
+                  labelText: 'Cover image URL',
                   border: OutlineInputBorder(),
-                  helperText: 'Story text JSON file ka CDN link -- yahi padha jaayega app me.',
                 ),
                 keyboardType: TextInputType.url,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Content URL is required.';
+                  if (v == null || v.trim().isEmpty) return 'Cover image URL is required.';
                   final uri = Uri.tryParse(v.trim());
                   if (uri == null || !uri.hasScheme) return 'Enter a valid URL.';
                   return null;
                 },
               ),
             ],
+
             const SizedBox(height: 28),
             FilledButton(
               onPressed: _submitting ? null : _submit,
