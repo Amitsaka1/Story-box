@@ -28,6 +28,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
 
   final _titleController = TextEditingController();
   final _coverUrlController = TextEditingController();
+  final _contentUrlController = TextEditingController();
 
   _ContentType _type = _ContentType.story;
   late Future<List<CategoryModel>> _categoriesFuture;
@@ -44,6 +45,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
   void dispose() {
     _titleController.dispose();
     _coverUrlController.dispose();
+    _contentUrlController.dispose();
     super.dispose();
   }
 
@@ -112,6 +114,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
         await _storyService.addStory(
           title: _titleController.text.trim(),
           coverImageUrl: _coverUrlController.text.trim(),
+          contentUrl: _contentUrlController.text.trim(),
           categoryId: _selectedCategory!.id,
         );
       } else {
@@ -131,6 +134,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
       );
       _titleController.clear();
       _coverUrlController.clear();
+      _contentUrlController.clear();
       setState(() => _selectedCategory = null);
     } catch (e) {
       if (!mounted) return;
@@ -214,12 +218,6 @@ class _AddContentScreenState extends State<AddContentScreen> {
               const SizedBox(height: 20),
             ],
             TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required.' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
               controller: _coverUrlController,
               decoration: const InputDecoration(
                 labelText: 'Cover image URL',
@@ -233,6 +231,24 @@ class _AddContentScreenState extends State<AddContentScreen> {
                 return null;
               },
             ),
+            if (_type == _ContentType.story) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _contentUrlController,
+                decoration: const InputDecoration(
+                  labelText: 'Content URL (R2/CDN JSON link)',
+                  border: OutlineInputBorder(),
+                  helperText: 'Story text JSON file ka CDN link -- yahi padha jaayega app me.',
+                ),
+                keyboardType: TextInputType.url,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Content URL is required.';
+                  final uri = Uri.tryParse(v.trim());
+                  if (uri == null || !uri.hasScheme) return 'Enter a valid URL.';
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 28),
             FilledButton(
               onPressed: _submitting ? null : _submit,
