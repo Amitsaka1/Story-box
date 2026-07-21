@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/story_model.dart';
+import 'package:my_app/screens/story/story_detail_screen.dart';
 import 'package:my_app/services/story_service.dart';
 import 'package:my_app/widgets/story/story_card.dart';
 import 'package:my_app/widgets/story/story_category_filter_menu.dart';
@@ -43,6 +44,12 @@ class _TrendingScreenState extends State<TrendingScreen> {
     final categories = stories.map((s) => s.category).toSet().toList();
     categories.sort();
     return categories;
+  }
+
+  void _openStory(StoryModel story) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => StoryDetailScreen(storyId: story.id)),
+    );
   }
 
   @override
@@ -123,6 +130,7 @@ class _TrendingScreenState extends State<TrendingScreen> {
                               story: story,
                               statLabel: '${StoryModel.formatCount(story.viewCount)} views',
                               statIcon: Icons.visibility_outlined,
+                              onTap: () => _openStory(story),
                             ),
                             Positioned(
                               top: 6,
