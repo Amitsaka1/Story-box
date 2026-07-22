@@ -73,6 +73,19 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteAccount({required String password}) async {
+    lastError = null;
+    try {
+      await _authService.deleteAccount(password: password);
+      currentUser = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      lastError = e.toString();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _authService.logout();
     currentUser = null;
