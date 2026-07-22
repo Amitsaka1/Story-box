@@ -85,7 +85,7 @@ class AuthGate extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (auth.isLoggedIn) {
-      return const SettingsScreen();
+      return const DashboardScreen();
     }
     return const LoginScreen();
   }
