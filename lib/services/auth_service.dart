@@ -77,6 +77,16 @@ class AuthService {
     }
   }
 
+  Future<void> deleteAccount({required String password}) async {
+    try {
+      await _dio.delete('/auth/me', data: {'password': password});
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not delete account.');
+    } finally {
+      await _tokenStorage.clear();
+    }
+  }
+
   Future<void> logout() async {
     final refreshToken = await _tokenStorage.getRefreshToken();
     try {
