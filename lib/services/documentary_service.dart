@@ -21,6 +21,26 @@ class DocumentaryService {
     }
   }
 
+  /// Paginated variant -- not wired into any screen yet; use this when
+  /// infinite-scroll UI is ready.
+  Future<({List<DocumentaryModel> data, bool hasMore, int totalCount})> fetchDocumentariesPaged({
+    required int page,
+    int limit = 20,
+  }) async {
+    try {
+      final res = await _dio.get('/documentaries', queryParameters: {'page': page, 'limit': limit});
+      final json = res.data as Map<String, dynamic>;
+      final list = json['data'] as List;
+      return (
+        data: list.map((j) => DocumentaryModel.fromJson(j as Map<String, dynamic>)).toList(),
+        hasMore: json['hasMore'] as bool,
+        totalCount: json['totalCount'] as int,
+      );
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load documentaries.');
+    }
+  }
+
   /// Admin only -- backend rejects this with 403 for non-admin users.
   Future<DocumentaryModel> addDocumentary({
     required String title,
