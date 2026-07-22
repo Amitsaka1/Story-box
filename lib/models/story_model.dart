@@ -25,6 +25,10 @@ class StoryModel {
   double get popularityScore =>
       (viewCount * 1.0) + (likeCount * 4.0) + (commentCount * 8.0) + (rating * 20000);
 
+  /// Only present when this StoryModel came from GET /stories/history --
+  /// null for every other endpoint (list/detail/watching).
+  final DateTime? viewedAt;
+
   const StoryModel({
     required this.id,
     required this.title,
@@ -38,6 +42,7 @@ class StoryModel {
     required this.addedAt,
     this.isWatching = false,
     this.watchProgress = 0.0,
+    this.viewedAt,
   });
 
   /// Maps the JSON shape returned by GET /stories (list/detail) and
@@ -59,6 +64,7 @@ class StoryModel {
       addedAt: DateTime.parse(json['addedAt'] as String),
       isWatching: json['watchProgress'] != null,
       watchProgress: watchProgress,
+      viewedAt: json['viewedAt'] != null ? DateTime.parse(json['viewedAt'] as String) : null,
     );
   }
 
