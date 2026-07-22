@@ -28,15 +28,24 @@ class StoryService {
     }
   }
 
-  /// Paginated variant -- pass page/limit to get { data, page, limit,
-  /// totalCount, hasMore } instead of the full catalog. Not wired into
-  /// any screen yet; use this when infinite-scroll UI is ready.
+  /// Paginated + filtered variant -- used by the "All Stories" grid's
+  /// infinite scroll. categoryId/from/to are optional; omit them for
+  /// an unfiltered page.
   Future<({List<StoryModel> data, bool hasMore, int totalCount})> fetchStoriesPaged({
     required int page,
     int limit = 20,
+    String? categoryId,
+    DateTime? from,
+    DateTime? to,
   }) async {
     try {
-      final res = await _dio.get('/stories', queryParameters: {'page': page, 'limit': limit});
+      final res = await _dio.get('/stories', queryParameters: {
+        'page': page,
+        'limit': limit,
+        if (categoryId != null) 'categoryId': categoryId,
+        if (from != null) 'from': from.toIso8601String(),
+        if (to != null) 'to': to.toIso8601String(),
+      });
       final json = res.data as Map<String, dynamic>;
       final list = json['data'] as List;
       return (
