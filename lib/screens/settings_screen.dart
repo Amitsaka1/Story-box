@@ -174,7 +174,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.delete_outline, color: Colors.red),
               title: Text('settings.delete_account'.tr(), style: const TextStyle(color: Colors.red)),
               subtitle: Text('settings.delete_account_note'.tr()),
-              enabled: false,
+              onTap: () => _confirmDeleteAccount(context),
             ),
           ),
         ],
@@ -255,6 +255,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text('settings.log_out'.tr()),
           ),
         ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAccount(BuildContext context) {
+    final passwordController = TextEditingController();
+    String? dialogError;
+    bool submitting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('settings.delete_account_confirm_title'.tr()),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('settings.delete_account_confirm_body'.tr()),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'settings.delete_account_password_label'.tr(),
+                  errorText: dialogError,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: submitting ? null : () => Navigator.pop(dialogContext),
+              child: Text('settings.cancel'.tr()),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      if (passwordController.text.isEmpty) {
+                        setDialogState(() => dialogError = 'settings.delete_account_password_required'.tr());
+                        return;
+                      }
+                      setDialogState(() {
+                        submitting = true;
+                        dialogError = null;
+                      });
+                      final authProvider = context.read<AuthProvider>();
+                      final ok = await authProvider.deleteAccount(password: passwordController.text);
+                      if (ok) {
+                        Navigator.pop(dialogContext);
+                        // Root widget should watch AuthProvider.isLoggedIn and
+                        // swap to the login screen automatically when it goes false.
+                      } else {
+                        setDialogState(() {
+                          submitting = false;
+                          dialogError = authProvider.lastError ?? 'settings.delete_account_generic_error'.tr();
+                        });
+                      }
+                    },
+              child: submitting
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text('settings.delete_account'.tr()),
+            ),
+          ],
+        ),
       ),
     );
   }
