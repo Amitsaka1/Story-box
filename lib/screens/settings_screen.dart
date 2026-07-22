@@ -317,8 +317,14 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       setState(() => _error = 'settings.current_password_required'.tr());
       return;
     }
-    if (_newController.text.length < 8) {
+    if (_newController.text.length < 10) {
       setState(() => _error = 'settings.new_password_min_length'.tr());
+      return;
+    }
+    if (!RegExp(r'[a-z]').hasMatch(_newController.text) ||
+        !RegExp(r'[A-Z]').hasMatch(_newController.text) ||
+        !RegExp(r'[0-9]').hasMatch(_newController.text)) {
+      setState(() => _error = 'settings.new_password_complexity'.tr());
       return;
     }
     if (_newController.text == _currentController.text) {
