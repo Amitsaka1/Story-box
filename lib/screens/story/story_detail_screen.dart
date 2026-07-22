@@ -133,12 +133,14 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
           final story = data.story;
           final interactions = data.interactions;
           final colorScheme = Theme.of(context).colorScheme;
+          final screenWidth = MediaQuery.of(context).size.width;
+          final bannerHeight = screenWidth * 1.5;
           final displayedProgress = _pendingProgress ?? interactions.progress;
 
           return CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 320,
+                expandedHeight: bannerHeight,
                 pinned: true,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Stack(
