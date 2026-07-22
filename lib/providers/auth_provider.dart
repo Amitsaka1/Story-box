@@ -41,6 +41,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> login({
     required String username,
     required String password,
+    required int formRenderedAt,
   }) async {
     isLoading = true;
     lastError = null;
@@ -49,7 +50,7 @@ class AuthProvider extends ChangeNotifier {
       currentUser = await _authService.login(
         username: username,
         password: password,
-        formRenderedAt: DateTime.now().millisecondsSinceEpoch,
+        formRenderedAt: formRenderedAt,
       );
       return true;
     } catch (e) {
