@@ -2,23 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/services/documentary_service.dart';
+import 'package:my_app/utils/date_range.dart';
 import 'package:my_app/widgets/documentary/documentary_card.dart';
 import 'package:my_app/widgets/documentary/documentary_time_filter_bar.dart';
 import 'package:my_app/widgets/documentary/documentary_sort_menu.dart';
 
 /// Documentary dashboard: time-range chips (All / Today / Yesterday /
 /// This Week / This Month / This Year) + a sort dropdown (Popular /
-/// Rating / Likes / Comments / Views), rendered as a 3-column grid.
-///
-/// The time buckets are calculated live from each documentary's
-/// addedAt every time this builds -- there's no manual "move it to
-/// yesterday" step. A documentary added 20 hours ago is "Today" right
-/// now; the moment the calendar date changes, the exact same
-/// addedAt value naturally falls into "Yesterday" / "This Week" on
-/// its own the next time the UI builds.
-///
-/// Documentaries now come from the backend (GET /documentaries)
-/// instead of dummy data.
+/// Rating / Likes / Comments / Views). Server-side paginated + filtered
+/// infinite scroll -- changing sort or time filter resets to page 1
+/// and re-fetches from the backend with that filter applied.
 class DocumentaryTab extends StatefulWidget {
   const DocumentaryTab({super.key});
 
@@ -28,7 +21,15 @@ class DocumentaryTab extends StatefulWidget {
 
 class _DocumentaryTabState extends State<DocumentaryTab> {
   final _documentaryService = DocumentaryService();
-  late Future<List<DocumentaryModel>> _documentariesFuture;
+  final _scrollController = ScrollController();
+  static const int _pageSize = 20;
+
+  final List<DocumentaryModel> _documentaries = [];
+  int _page = 1;
+  bool _hasMore = true;
+  bool _initialLoading = true;
+  bool _loadingMore = false;
+  Object? _error;
 
   DocumentaryTimeFilter _timeFilter = DocumentaryTimeFilter.all;
   DocumentarySortOption _sort = DocumentarySortOption.popularity;
@@ -36,63 +37,96 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
   @override
   void initState() {
     super.initState();
-    _documentariesFuture = _documentaryService.fetchDocumentaries();
+    _loadInitial();
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _refresh() async {
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_hasMore || _loadingMore || _initialLoading) return;
+    final threshold = _scrollController.position.maxScrollExtent - 400;
+    if (_scrollController.position.pixels >= threshold) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadInitial() async {
     setState(() {
-      _documentariesFuture = _documentaryService.fetchDocumentaries();
+      _initialLoading = true;
+      _error = null;
+      _page = 1;
+      _hasMore = true;
+      _documentaries.clear();
     });
-    await _documentariesFuture;
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
-  List<DocumentaryModel> _timeFiltered(List<DocumentaryModel> documentaries) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-
-    switch (_timeFilter) {
-      case DocumentaryTimeFilter.all:
-        return documentaries;
-      case DocumentaryTimeFilter.today:
-        return documentaries.where((d) => _isSameDay(d.addedAt, today)).toList();
-      case DocumentaryTimeFilter.yesterday:
-        return documentaries.where((d) => _isSameDay(d.addedAt, yesterday)).toList();
-      case DocumentaryTimeFilter.thisWeek:
-        final weekStart = today.subtract(const Duration(days: 6));
-        return documentaries.where((d) => !d.addedAt.isBefore(weekStart)).toList();
-      case DocumentaryTimeFilter.thisMonth:
-        return documentaries
-            .where((d) => d.addedAt.year == now.year && d.addedAt.month == now.month)
-            .toList();
-      case DocumentaryTimeFilter.thisYear:
-        return documentaries.where((d) => d.addedAt.year == now.year).toList();
+    try {
+      final range = computeDateRange(_timeFilter.name);
+      final result = await _documentaryService.fetchDocumentariesPaged(
+        page: 1,
+        limit: _pageSize,
+        sort: _sort.name,
+        from: range.from,
+        to: range.to,
+      );
+      if (!mounted) return;
+      setState(() {
+        _documentaries.addAll(result.data);
+        _hasMore = result.hasMore;
+        _initialLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e;
+        _initialLoading = false;
+      });
     }
   }
 
-  List<DocumentaryModel> _sorted(List<DocumentaryModel> documentaries) {
-    final list = [...documentaries];
-    switch (_sort) {
-      case DocumentarySortOption.popularity:
-        list.sort((a, b) => b.popularityScore.compareTo(a.popularityScore));
-        break;
-      case DocumentarySortOption.rating:
-        list.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case DocumentarySortOption.likes:
-        list.sort((a, b) => b.likeCount.compareTo(a.likeCount));
-        break;
-      case DocumentarySortOption.comments:
-        list.sort((a, b) => b.commentCount.compareTo(a.commentCount));
-        break;
-      case DocumentarySortOption.views:
-        list.sort((a, b) => b.viewCount.compareTo(a.viewCount));
-        break;
+  Future<void> _loadMore() async {
+    setState(() => _loadingMore = true);
+    try {
+      final range = computeDateRange(_timeFilter.name);
+      final nextPage = _page + 1;
+      final result = await _documentaryService.fetchDocumentariesPaged(
+        page: nextPage,
+        limit: _pageSize,
+        sort: _sort.name,
+        from: range.from,
+        to: range.to,
+      );
+      if (!mounted) return;
+      setState(() {
+        _documentaries.addAll(result.data);
+        _hasMore = result.hasMore;
+        _page = nextPage;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
     }
-    return list;
+  }
+
+  Future<void> _refresh() => _loadInitial();
+
+  void _onSortChanged(DocumentarySortOption sort) {
+    setState(() {
+      // Tapping the already-active sort option again clears back to
+      // the default (Popular) -- same behavior as before.
+      _sort = (sort == _sort) ? DocumentarySortOption.popularity : sort;
+    });
+    _loadInitial();
+  }
+
+  void _onTimeFilterChanged(DocumentaryTimeFilter filter) {
+    setState(() => _timeFilter = filter);
+    _loadInitial();
   }
 
   String _statFor(DocumentaryModel d) {
@@ -103,21 +137,13 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
           'views': DocumentaryModel.formatCount(d.viewCount),
         });
       case DocumentarySortOption.rating:
-        return 'documentary.stat_rating'.tr(namedArgs: {
-          'rating': d.rating.toStringAsFixed(1),
-        });
+        return 'documentary.stat_rating'.tr(namedArgs: {'rating': d.rating.toStringAsFixed(1)});
       case DocumentarySortOption.likes:
-        return 'documentary.stat_likes'.tr(namedArgs: {
-          'count': DocumentaryModel.formatCount(d.likeCount),
-        });
+        return 'documentary.stat_likes'.tr(namedArgs: {'count': DocumentaryModel.formatCount(d.likeCount)});
       case DocumentarySortOption.comments:
-        return 'documentary.stat_comments'.tr(namedArgs: {
-          'count': DocumentaryModel.formatCount(d.commentCount),
-        });
+        return 'documentary.stat_comments'.tr(namedArgs: {'count': DocumentaryModel.formatCount(d.commentCount)});
       case DocumentarySortOption.views:
-        return 'documentary.stat_views'.tr(namedArgs: {
-          'count': DocumentaryModel.formatCount(d.viewCount),
-        });
+        return 'documentary.stat_views'.tr(namedArgs: {'count': DocumentaryModel.formatCount(d.viewCount)});
     }
   }
 
@@ -138,113 +164,96 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<DocumentaryModel>>(
-      future: _documentariesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    if (_initialLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off, size: 48, color: Theme.of(context).colorScheme.outline),
+              const SizedBox(height: 12),
+              Text('$_error', textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: _loadInitial, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(0, 16, 0, 10),
+            sliver: SliverToBoxAdapter(
+              child: Row(
                 children: [
-                  Icon(Icons.cloud_off, size: 48, color: Theme.of(context).colorScheme.outline),
-                  const SizedBox(height: 12),
-                  Text('${snapshot.error}', textAlign: TextAlign.center),
-                  const SizedBox(height: 12),
-                  FilledButton(onPressed: _refresh, child: const Text('Retry')),
+                  DocumentarySortMenu(selected: _sort, onChanged: _onSortChanged),
+                  Expanded(
+                    child: DocumentaryTimeFilterBar(selected: _timeFilter, onSelected: _onTimeFilterChanged),
+                  ),
                 ],
               ),
             ),
-          );
-        }
-
-        final documentaries = _sorted(_timeFiltered(snapshot.data ?? const []));
-
-        return RefreshIndicator(
-          onRefresh: _refresh,
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(0, 16, 0, 10),
-                sliver: SliverToBoxAdapter(
-                  child: Row(
+          ),
+          if (_documentaries.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      DocumentarySortMenu(
-                        selected: _sort,
-                        onChanged: (sort) {
-                          setState(() {
-                            // Tapping the already-active sort option again
-                            // clears the filter back to the default (Popular).
-                            _sort = (sort == _sort) ? DocumentarySortOption.popularity : sort;
-                          });
-                        },
-                      ),
-                      Expanded(
-                        child: DocumentaryTimeFilterBar(
-                          selected: _timeFilter,
-                          onSelected: (filter) => setState(() => _timeFilter = filter),
-                        ),
+                      Icon(Icons.movie_creation_outlined, size: 56, color: Theme.of(context).colorScheme.outline),
+                      const SizedBox(height: 12),
+                      Text(
+                        'documentary.no_documentaries_filter'.tr(namedArgs: {'filter': _timeFilter.label}),
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ],
                   ),
                 ),
               ),
-              if (documentaries.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.movie_creation_outlined,
-                            size: 56,
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'documentary.no_documentaries_filter'.tr(namedArgs: {'filter': _timeFilter.label}),
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                  sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.48,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final d = documentaries[index];
-                        return DocumentaryCard(
-                          documentary: d,
-                          statLabel: _statFor(d),
-                          statIcon: _statIcon,
-                        );
-                      },
-                      childCount: documentaries.length,
-                    ),
-                  ),
+            )
+          else ...[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.48,
                 ),
-            ],
-          ),
-        );
-      },
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final d = _documentaries[index];
+                    return DocumentaryCard(documentary: d, statLabel: _statFor(d), statIcon: _statIcon);
+                  },
+                  childCount: _documentaries.length,
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _loadingMore
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : const SizedBox(height: 20),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
