@@ -13,6 +13,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final int _formRenderedAt = DateTime.now().millisecondsSinceEpoch;
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -33,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await auth.login(
       username: _usernameController.text.trim(),
       password: _passwordController.text,
+      formRenderedAt: _formRenderedAt,
     );
 
     if (!success && mounted) {
