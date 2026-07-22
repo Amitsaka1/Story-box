@@ -58,6 +58,24 @@ class StoryService {
     }
   }
 
+  Future<({List<StoryModel> data, bool hasMore, int totalCount})> fetchHistoryPaged({
+    required int page,
+    int limit = 20,
+  }) async {
+    try {
+      final res = await _dio.get('/stories/history', queryParameters: {'page': page, 'limit': limit});
+      final json = res.data as Map<String, dynamic>;
+      final list = json['data'] as List;
+      return (
+        data: list.map((j) => StoryModel.fromJson(j as Map<String, dynamic>)).toList(),
+        hasMore: json['hasMore'] as bool,
+        totalCount: json['totalCount'] as int,
+      );
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load history.');
+    }
+  }
+
   Future<List<CategoryModel>> fetchCategories() async {
     try {
       final res = await _dio.get('/categories');
