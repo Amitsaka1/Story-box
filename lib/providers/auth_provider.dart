@@ -16,6 +16,7 @@ class AuthProvider extends ChangeNotifier {
 
   UserModel? currentUser;
   bool isLoading = false;
+  bool isRestoring = false;
   String? lastError;
   ForceLogoutReason? lastForceLogoutReason;
 
@@ -24,7 +25,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> tryRestoreSession() async {
     final hasTokens = await _tokenStorage.hasTokens();
     if (!hasTokens) return;
-    isLoading = true;
+    isRestoring = true;
     notifyListeners();
     try {
       currentUser = await _authService.fetchMe();
@@ -32,7 +33,7 @@ class AuthProvider extends ChangeNotifier {
       currentUser = null;
       await _tokenStorage.clear();
     } finally {
-      isLoading = false;
+      isRestoring = false;
       notifyListeners();
     }
   }
