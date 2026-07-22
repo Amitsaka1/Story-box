@@ -21,14 +21,23 @@ class DocumentaryService {
     }
   }
 
-  /// Paginated variant -- not wired into any screen yet; use this when
-  /// infinite-scroll UI is ready.
+  /// Paginated + filtered variant -- used by the documentary grid's
+  /// infinite scroll. sort/from/to are optional.
   Future<({List<DocumentaryModel> data, bool hasMore, int totalCount})> fetchDocumentariesPaged({
     required int page,
     int limit = 20,
+    String? sort,
+    DateTime? from,
+    DateTime? to,
   }) async {
     try {
-      final res = await _dio.get('/documentaries', queryParameters: {'page': page, 'limit': limit});
+      final res = await _dio.get('/documentaries', queryParameters: {
+        'page': page,
+        'limit': limit,
+        if (sort != null) 'sort': sort,
+        if (from != null) 'from': from.toIso8601String(),
+        if (to != null) 'to': to.toIso8601String(),
+      });
       final json = res.data as Map<String, dynamic>;
       final list = json['data'] as List;
       return (
@@ -40,7 +49,6 @@ class DocumentaryService {
       throw _extractError(e, 'Could not load documentaries.');
     }
   }
-
   /// Admin only -- backend rejects this with 403 for non-admin users.
   Future<DocumentaryModel> addDocumentary({
     required String title,
