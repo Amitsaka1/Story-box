@@ -17,14 +17,33 @@ class StoryService {
   }
 
   /// All stories, newest first. Category/time filtering and sorting
-  /// stays on-device (same as the old dummy-data days) -- the catalog
-  /// is small enough that fetching everything once and slicing it
-  /// client-side is simpler than a query-param API.
+  /// stays on-device -- catalog small enough for now.
   Future<List<StoryModel>> fetchStories() async {
     try {
       final res = await _dio.get('/stories');
       final list = res.data as List;
       return list.map((json) => StoryModel.fromJson(json as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load stories.');
+    }
+  }
+
+  /// Paginated variant -- pass page/limit to get { data, page, limit,
+  /// totalCount, hasMore } instead of the full catalog. Not wired into
+  /// any screen yet; use this when infinite-scroll UI is ready.
+  Future<({List<StoryModel> data, bool hasMore, int totalCount})> fetchStoriesPaged({
+    required int page,
+    int limit = 20,
+  }) async {
+    try {
+      final res = await _dio.get('/stories', queryParameters: {'page': page, 'limit': limit});
+      final json = res.data as Map<String, dynamic>;
+      final list = json['data'] as List;
+      return (
+        data: list.map((j) => StoryModel.fromJson(j as Map<String, dynamic>)).toList(),
+        hasMore: json['hasMore'] as bool,
+        totalCount: json['totalCount'] as int,
+      );
     } on DioException catch (e) {
       throw _extractError(e, 'Could not load stories.');
     }
