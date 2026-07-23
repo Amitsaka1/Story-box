@@ -9,7 +9,18 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - run: flutter pub get
+      - run: flutter test
+
   build-web:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +36,7 @@ jobs:
           publish_dir: ./build/web
 
   build-apk:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
