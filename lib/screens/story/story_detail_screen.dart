@@ -398,6 +398,24 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
           selected.text,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
         ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            FilledButton.tonalIcon(
+              onPressed: () => _toggleLike(data),
+              icon: Icon(data.interactions.isLiked ? Icons.favorite : Icons.favorite_border),
+              label: Text(data.interactions.isLiked ? 'Liked' : 'Like'),
+            ),
+            const SizedBox(width: 12),
+            // Cosmetic only -- confirmed no backend call, just a visual
+            // toggle so tapping it "feels" like something happened.
+            IconButton(
+              onPressed: () => setState(() => _dislikedLocally = !_dislikedLocally),
+              icon: Icon(_dislikedLocally ? Icons.thumb_down : Icons.thumb_down_outlined),
+              color: _dislikedLocally ? Theme.of(context).colorScheme.error : null,
+            ),
+          ],
+        ),
       ],
     );
   }
