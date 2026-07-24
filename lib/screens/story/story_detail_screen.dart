@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/models/story_content_model.dart';
+export 'package:my_app/models/story_content_model.dart' show StoryChapter;
 import 'package:my_app/models/story_interaction_model.dart';
 import 'package:my_app/models/story_model.dart';
 import 'package:my_app/services/story_service.dart';
@@ -18,6 +19,12 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
 
   late Future<_DetailData> _dataFuture;
   double? _pendingProgress;
+
+  // Episode selector state -- which episode's text is currently shown,
+  // and whether the "All Episodes" panel is expanded. The panel stays
+  // open across episode picks until manually closed (per product spec).
+  int _selectedChapterNo = 1;
+  bool _showAllEpisodesPanel = false;
 
   @override
   void initState() {
@@ -272,25 +279,7 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                     Text('Story', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 16),
                     if (data.content != null)
-                      ...data.content!.chapters.map(
-                        (chapter) => Padding(
-                          padding: const EdgeInsets.only(bottom: 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Chapter ${chapter.chapterNo}',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                chapter.text,
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
+                      _buildEpisodeReader(context, data.content!.chapters, colorScheme)
                     else
                       Text(
                         data.contentError ?? 'Text load nahi ho paya.',
@@ -302,6 +291,143 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  // Builds the episode number-selector row + "All Episodes" expandable
+  // panel + the currently-selected episode's text only.
+  Widget _buildEpisodeReader(BuildContext context, List<StoryChapter> chapters, ColorScheme colorScheme) {
+    if (chapters.isEmpty) {
+      return Text('Is story me abhi koi episode nahi hai.', style: TextStyle(color: colorScheme.onSurfaceVariant));
+    }
+
+    final sorted = [...chapters]..sort((a, b) => a.chapterNo.compareTo(b.chapterNo));
+    final visibleCount = sorted.length > 10 ? 10 : sorted.length;
+    final hasMore = sorted.length > 10;
+    final selected = sorted.firstWhere(
+      (c) => c.chapterNo == _selectedChapterNo,
+      orElse: () => sorted.first,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              for (final chapter in sorted.take(visibleCount)) ...[
+                _EpisodeNumberButton(
+                  number: chapter.chapterNo,
+                  selected: chapter.chapterNo == _selectedChapterNo,
+                  onTap: () => setState(() => _selectedChapterNo = chapter.chapterNo),
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (hasMore)
+                OutlinedButton(
+                  onPressed: () => setState(() => _showAllEpisodesPanel = true),
+                  child: const Text('More'),
+                ),
+            ],
+          ),
+        ),
+        if (_showAllEpisodesPanel) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('All Episodes', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setState(() => _showAllEpisodesPanel = false),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 8,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 1,
+                  ),
+                  itemCount: sorted.length,
+                  itemBuilder: (context, index) {
+                    final chapter = sorted[index];
+                    return _EpisodeNumberButton(
+                      number: chapter.chapterNo,
+                      selected: chapter.chapterNo == _selectedChapterNo,
+                      // Manual close only -- picking an episode here does
+                      // NOT auto-close the panel.
+                      onTap: () => setState(() => _selectedChapterNo = chapter.chapterNo),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        Text(
+          'Chapter ${selected.chapterNo}',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          selected.text,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+        ),
+      ],
+    );
+  }
+}
+
+// Small reusable numbered button -- used both in the top row and inside
+// the "All Episodes" grid, so both look/behave identically.
+class _EpisodeNumberButton extends StatelessWidget {
+  final int number;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _EpisodeNumberButton({required this.number, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Center(
+            child: Text(
+              '$number',
+              style: TextStyle(
+                color: selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
