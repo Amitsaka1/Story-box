@@ -26,6 +26,11 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
   int _selectedChapterNo = 1;
   bool _showAllEpisodesPanel = false;
 
+  // Dislike is purely cosmetic (confirmed: no backend effect) -- one
+  // local toggle for the whole screen, shown at the end of whichever
+  // episode is currently open.
+  bool _dislikedLocally = false;
+  
   @override
   void initState() {
     super.initState();
@@ -279,7 +284,7 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                     Text('Story', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 16),
                     if (data.content != null)
-                      _buildEpisodeReader(context, data.content!.chapters, colorScheme)
+                      _buildEpisodeReader(context, data, colorScheme)
                     else
                       Text(
                         data.contentError ?? 'Text load nahi ho paya.',
@@ -296,8 +301,9 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
   }
 
   // Builds the episode number-selector row + "All Episodes" expandable
-  // panel + the currently-selected episode's text only.
-  Widget _buildEpisodeReader(BuildContext context, List<StoryChapter> chapters, ColorScheme colorScheme) {
+  // panel + the currently-selected episode's text + Like/Dislike row.
+  Widget _buildEpisodeReader(BuildContext context, _DetailData data, ColorScheme colorScheme) {
+    final chapters = data.content!.chapters;
     if (chapters.isEmpty) {
       return Text('Is story me abhi koi episode nahi hai.', style: TextStyle(color: colorScheme.onSurfaceVariant));
     }
