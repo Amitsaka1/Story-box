@@ -35,6 +35,7 @@ class DocumentaryService {
     String? sort,
     DateTime? from,
     DateTime? to,
+    String? search,
   }) async {
     try {
       final res = await _dio.get('/documentaries', queryParameters: {
@@ -43,6 +44,7 @@ class DocumentaryService {
         if (sort != null) 'sort': sort,
         if (from != null) 'from': from.toIso8601String(),
         if (to != null) 'to': to.toIso8601String(),
+        if (search != null && search.isNotEmpty) 'search': search,
       });
       final json = res.data as Map<String, dynamic>;
       final list = json['data'] as List;
@@ -176,6 +178,15 @@ class DocumentaryService {
       return StoryContentModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (_) {
       throw 'Could not load the documentary text.';
+    }
+  }
+
+  /// Admin only -- backend rejects this with 403 for non-admin users.
+  Future<void> deleteDocumentary(String id) async {
+    try {
+      await _dio.delete('/documentaries/$id');
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not delete documentary.');
     }
   }
 
