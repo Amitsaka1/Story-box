@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:my_app/core/api_client.dart';
+import 'package:my_app/models/category_model.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/models/documentary_interaction_model.dart';
 import 'package:my_app/models/story_content_model.dart'; // reused: identical {chapters:[{chapterNo,text}]} shape
@@ -176,24 +179,44 @@ class DocumentaryService {
     }
   }
 
-  /// Admin only -- backend rejects this with 403 for non-admin users.
+  Future<List<CategoryModel>> fetchDocumentaryCategories() async {
+    try {
+      final res = await _dio.get('/documentary-categories');
+      final list = res.data as List;
+      return list.map((json) => CategoryModel.fromJson(json as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load categories.');
+    }
+  }
+
+  Future<CategoryModel> addDocumentaryCategory({required String name}) async {
+    try {
+      final res = await _dio.post('/documentary-categories', data: {'name': name});
+      return CategoryModel.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not create category.');
+    }
+  }
+
+  /// Admin only -- same multipart shape as StoryService.addStory now:
+  /// cover image FILE + category + chapters, not a plain URL.
   Future<DocumentaryModel> addDocumentary({
     required String title,
-    required String coverImageUrl,
-    double rating = 0,
-    int viewCount = 0,
-    int likeCount = 0,
-    int commentCount = 0,
+    required String categoryId,
+    required List<Map<String, dynamic>> chapters,
+    required Uint8List coverBytes,
+    required String coverFilename,
+    String status = 'ongoing',
   }) async {
     try {
-      final res = await _dio.post('/documentaries', data: {
+      final formData = FormData.fromMap({
         'title': title,
-        'coverImageUrl': coverImageUrl,
-        'rating': rating,
-        'viewCount': viewCount,
-        'likeCount': likeCount,
-        'commentCount': commentCount,
+        'categoryId': categoryId,
+        'chapters': jsonEncode(chapters),
+        'status': status,
+        'cover': MultipartFile.fromBytes(coverBytes, filename: coverFilename),
       });
+      final res = await _dio.post('/documentaries', data: formData);
       return DocumentaryModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _extractError(e, 'Could not create documentary.');
