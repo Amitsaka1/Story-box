@@ -107,12 +107,14 @@ class StoryService {
     required List<Map<String, dynamic>> chapters,
     required Uint8List coverBytes,
     required String coverFilename,
+    String status = 'ongoing',
   }) async {
     try {
       final formData = FormData.fromMap({
         'title': title,
         'categoryId': categoryId,
         'chapters': jsonEncode(chapters),
+        'status': status,
         'cover': MultipartFile.fromBytes(coverBytes, filename: coverFilename),
       });
       final res = await _dio.post('/stories', data: formData);
