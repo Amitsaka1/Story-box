@@ -3,6 +3,7 @@ import 'package:my_app/core/api_client.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/models/documentary_interaction_model.dart';
 import 'package:my_app/models/story_content_model.dart'; // reused: identical {chapters:[{chapterNo,text}]} shape
+import 'package:my_app/models/comment_model.dart';
 
 class DocumentaryService {
   final _dio = ApiClient.instance.dio;
@@ -125,13 +126,7 @@ class DocumentaryService {
     }
   }
 
-  Future<void> updateProgress(String documentaryId, double progress) async {
-    try {
-      await _dio.put('/documentaries/$documentaryId/progress', data: {'progress': progress});
-    } on DioException catch (e) {
-      throw _extractError(e, 'Could not save your progress.');
-    }
-  }
+  
 
   /// Fetches the chapters JSON straight from the CDN, same as
   /// StoryService.fetchStoryContent -- identical shape, so it reuses
