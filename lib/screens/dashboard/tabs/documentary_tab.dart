@@ -6,7 +6,7 @@ import 'package:my_app/utils/date_range.dart';
 import 'package:my_app/widgets/documentary/documentary_card.dart';
 import 'package:my_app/widgets/documentary/documentary_time_filter_bar.dart';
 import 'package:my_app/widgets/documentary/documentary_sort_menu.dart';
-
+import 'package:my_app/screens/documentary/documentary_detail_screen.dart';
 /// Documentary dashboard: time-range chips (All / Today / Yesterday /
 /// This Week / This Month / This Year) + a sort dropdown (Popular /
 /// Rating / Likes / Comments / Views). Server-side paginated + filtered
@@ -237,7 +237,14 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final d = _documentaries[index];
-                    return DocumentaryCard(documentary: d, statLabel: _statFor(d), statIcon: _statIcon);
+                    return DocumentaryCard(
+                      documentary: d,
+                      statLabel: _statFor(d),
+                      statIcon: _statIcon,
+                      onTap: () => Navigator.of(context)
+                          .push(MaterialPageRoute(builder: (_) => DocumentaryDetailScreen(documentaryId: d.id)))
+                          .then((_) => _loadInitial()),
+                    );
                   },
                   childCount: _documentaries.length,
                 ),
