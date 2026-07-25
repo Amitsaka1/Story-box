@@ -7,11 +7,10 @@ import 'package:my_app/services/story_service.dart';
 
 enum _ContentType { story, documentary }
 
-/// Admin-only screen to add new content.
-///   Story -> category select + title + cover image (file) + chapters
-///            (text, ek ya zyada) -- backend khud R2 pe upload karke
-///            JSON + image URLs banata hai.
-///   Documentary -> abhi bhi URL-based hai (alag flow, chhua nahi).
+/// Admin-only screen to add new content. Story and Documentary now use
+/// the EXACT same flow: category select + title + cover image (file) +
+/// chapters + ongoing/completed status. Only which service gets called
+/// (and which category list is used) differs.
 class AddContentScreen extends StatefulWidget {
   const AddContentScreen({super.key});
 
@@ -25,7 +24,6 @@ class _AddContentScreenState extends State<AddContentScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _titleController = TextEditingController();
-  final _coverUrlController = TextEditingController(); // documentary ke liye hi ab
 
   final _picker = ImagePicker();
   Uint8List? _coverBytes;
@@ -36,22 +34,28 @@ class _AddContentScreenState extends State<AddContentScreen> {
   _ContentType _type = _ContentType.story;
   late Future<List<CategoryModel>> _categoriesFuture;
   CategoryModel? _selectedCategory;
+  String _status = 'ongoing';
   bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
-    _categoriesFuture = _storyService.fetchCategories();
+    _categoriesFuture = _fetchCategoriesForType();
   }
 
   @override
   void dispose() {
     _titleController.dispose();
-    _coverUrlController.dispose();
     for (final c in _chapterControllers) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<List<CategoryModel>> _fetchCategoriesForType() {
+    return _type == _ContentType.story
+        ? _storyService.fetchCategories()
+        : _documentaryService.fetchDocumentaryCategories();
   }
 
   Future<void> _pickCoverImage() async {
@@ -69,7 +73,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
   }
 
   void _removeChapterField(int index) {
-    if (_chapterControllers.length == 1) return; // kam se kam 1 chapter rehna chahiye
+    if (_chapterControllers.length == 1) return;
     setState(() {
       _chapterControllers[index].dispose();
       _chapterControllers.removeAt(index);
@@ -77,13 +81,12 @@ class _AddContentScreenState extends State<AddContentScreen> {
   }
 
   Future<void> _refreshCategories({CategoryModel? autoSelect}) async {
-    final future = _storyService.fetchCategories();
+    final future = _fetchCategoriesForType();
     setState(() => _categoriesFuture = future);
     final categories = await future;
     if (!mounted) return;
     setState(() {
-      _selectedCategory = autoSelect ??
-          (categories.contains(_selectedCategory) ? _selectedCategory : null);
+      _selectedCategory = autoSelect ?? (categories.contains(_selectedCategory) ? _selectedCategory : null);
     });
   }
 
@@ -99,10 +102,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
           decoration: const InputDecoration(hintText: 'e.g. Horror'),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(controller.text.trim()),
             child: const Text('Add'),
@@ -114,12 +114,12 @@ class _AddContentScreenState extends State<AddContentScreen> {
     if (name == null || name.isEmpty) return;
 
     try {
-      final category = await _storyService.addCategory(name: name);
+      final category = _type == _ContentType.story
+          ? await _storyService.addCategory(name: name)
+          : await _documentaryService.addDocumentaryCategory(name: name);
       await _refreshCategories(autoSelect: category);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Category "${category.name}" added.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Category "${category.name}" added.')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -129,59 +129,52 @@ class _AddContentScreenState extends State<AddContentScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_type == _ContentType.story) {
-      if (_selectedCategory == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a category.')),
-        );
-        return;
-      }
-      if (_coverBytes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please pick a cover image.')),
-        );
-        return;
-      }
-      final hasEmptyChapter = _chapterControllers.any((c) => c.text.trim().isEmpty);
-      if (hasEmptyChapter) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Every chapter needs some text.')),
-        );
-        return;
-      }
+    if (_selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a category.')));
+      return;
+    }
+    if (_coverBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please pick a cover image.')));
+      return;
+    }
+    final hasEmptyChapter = _chapterControllers.any((c) => c.text.trim().isEmpty);
+    if (hasEmptyChapter) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Every chapter needs some text.')));
+      return;
     }
 
     setState(() => _submitting = true);
     try {
+      final chapters = List.generate(
+        _chapterControllers.length,
+        (i) => {'chapterNo': i + 1, 'text': _chapterControllers[i].text.trim()},
+      );
+
       if (_type == _ContentType.story) {
-        final chapters = List.generate(
-          _chapterControllers.length,
-          (i) => {'chapterNo': i + 1, 'text': _chapterControllers[i].text.trim()},
-        );
         await _storyService.addStory(
           title: _titleController.text.trim(),
           categoryId: _selectedCategory!.id,
           chapters: chapters,
           coverBytes: _coverBytes!,
           coverFilename: _coverFilename!,
+          status: _status,
         );
       } else {
         await _documentaryService.addDocumentary(
           title: _titleController.text.trim(),
-          coverImageUrl: _coverUrlController.text.trim(),
+          categoryId: _selectedCategory!.id,
+          chapters: chapters,
+          coverBytes: _coverBytes!,
+          coverFilename: _coverFilename!,
+          status: _status,
         );
       }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _type == _ContentType.story ? 'Story added.' : 'Documentary added.',
-          ),
-        ),
+        SnackBar(content: Text(_type == _ContentType.story ? 'Story added.' : 'Documentary added.')),
       );
       _titleController.clear();
-      _coverUrlController.clear();
       setState(() {
         _coverBytes = null;
         _coverFilename = null;
@@ -192,6 +185,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
           ..clear()
           ..add(TextEditingController());
         _selectedCategory = null;
+        _status = 'ongoing';
       });
     } catch (e) {
       if (!mounted) return;
@@ -212,11 +206,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
           children: [
             SegmentedButton<_ContentType>(
               segments: const [
-                ButtonSegment(
-                  value: _ContentType.story,
-                  label: Text('Story'),
-                  icon: Icon(Icons.menu_book_outlined),
-                ),
+                ButtonSegment(value: _ContentType.story, label: Text('Story'), icon: Icon(Icons.menu_book_outlined)),
                 ButtonSegment(
                   value: _ContentType.documentary,
                   label: Text('Documentary'),
@@ -224,53 +214,52 @@ class _AddContentScreenState extends State<AddContentScreen> {
                 ),
               ],
               selected: {_type},
-              onSelectionChanged: (selection) => setState(() => _type = selection.first),
+              onSelectionChanged: (selection) {
+                setState(() {
+                  _type = selection.first;
+                  _selectedCategory = null;
+                  _categoriesFuture = _fetchCategoriesForType();
+                });
+              },
             ),
             const SizedBox(height: 24),
-            if (_type == _ContentType.story) ...[
-              Text('Category', style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: 8),
-              FutureBuilder<List<CategoryModel>>(
-                future: _categoriesFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: LinearProgressIndicator(),
-                    );
-                  }
-                  if (snapshot.hasError) {
-                    return Text('Could not load categories: ${snapshot.error}');
-                  }
-                  final categories = snapshot.data ?? const [];
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<CategoryModel>(
-                          value: _selectedCategory,
-                          isExpanded: true,
-                          hint: Text(
-                            categories.isEmpty ? 'No categories yet' : 'Select a category',
-                          ),
-                          decoration: const InputDecoration(border: OutlineInputBorder()),
-                          items: categories
-                              .map((c) => DropdownMenuItem(value: c, child: Text(c.name)))
-                              .toList(),
-                          onChanged: (c) => setState(() => _selectedCategory = c),
-                        ),
+
+            Text('Category', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            FutureBuilder<List<CategoryModel>>(
+              future: _categoriesFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: LinearProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Text('Could not load categories: ${snapshot.error}');
+                }
+                final categories = snapshot.data ?? const [];
+                return Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<CategoryModel>(
+                        value: _selectedCategory,
+                        isExpanded: true,
+                        hint: Text(categories.isEmpty ? 'No categories yet' : 'Select a category'),
+                        decoration: const InputDecoration(border: OutlineInputBorder()),
+                        items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
+                        onChanged: (c) => setState(() => _selectedCategory = c),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        onPressed: _showAddCategoryDialog,
-                        icon: const Icon(Icons.add),
-                        tooltip: 'New category',
-                      ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      onPressed: _showAddCategoryDialog,
+                      icon: const Icon(Icons.add),
+                      tooltip: 'New category',
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+
             TextFormField(
               controller: _titleController,
               decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),
@@ -278,87 +267,76 @@ class _AddContentScreenState extends State<AddContentScreen> {
             ),
             const SizedBox(height: 16),
 
-            if (_type == _ContentType.story) ...[
-              // ---------------- Cover image picker ----------------
-              Text('Cover image', style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: 8),
-              if (_coverBytes != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(_coverBytes!, height: 160, fit: BoxFit.cover, width: double.infinity),
-                ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _pickCoverImage,
-                icon: const Icon(Icons.image_outlined),
-                label: Text(_coverBytes == null ? 'Pick cover image' : 'Change cover image'),
-              ),
-              const SizedBox(height: 24),
+            Text('Status', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'ongoing', label: Text('Ongoing')),
+                ButtonSegment(value: 'completed', label: Text('Completed')),
+              ],
+              selected: {_status},
+              onSelectionChanged: (selection) => setState(() => _status = selection.first),
+            ),
+            const SizedBox(height: 24),
 
-              // ---------------- Chapters ----------------
-              Text('Story text (chapters)', style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: 8),
-              ...List.generate(_chapterControllers.length, (i) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text('Chapter ${i + 1}', style: Theme.of(context).textTheme.bodyMedium),
-                          const Spacer(),
-                          if (_chapterControllers.length > 1)
-                            IconButton(
-                              onPressed: () => _removeChapterField(i),
-                              icon: const Icon(Icons.close, size: 18),
-                              tooltip: 'Remove chapter',
-                            ),
-                        ],
-                      ),
-                      TextFormField(
-                        controller: _chapterControllers[i],
-                        maxLines: 6,
-                        decoration: const InputDecoration(
-                          hintText: 'Chapter ka text yahan likho...',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              OutlinedButton.icon(
-                onPressed: _addChapterField,
-                icon: const Icon(Icons.add),
-                label: const Text('Add chapter'),
+            Text('Cover image', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            if (_coverBytes != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(_coverBytes!, height: 160, fit: BoxFit.cover, width: double.infinity),
               ),
-            ] else ...[
-              TextFormField(
-                controller: _coverUrlController,
-                decoration: const InputDecoration(
-                  labelText: 'Cover image URL',
-                  border: OutlineInputBorder(),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _pickCoverImage,
+              icon: const Icon(Icons.image_outlined),
+              label: Text(_coverBytes == null ? 'Pick cover image' : 'Change cover image'),
+            ),
+            const SizedBox(height: 24),
+
+            Text('Chapters', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            ...List.generate(_chapterControllers.length, (i) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Chapter ${i + 1}', style: Theme.of(context).textTheme.bodyMedium),
+                        const Spacer(),
+                        if (_chapterControllers.length > 1)
+                          IconButton(
+                            onPressed: () => _removeChapterField(i),
+                            icon: const Icon(Icons.close, size: 18),
+                            tooltip: 'Remove chapter',
+                          ),
+                      ],
+                    ),
+                    TextFormField(
+                      controller: _chapterControllers[i],
+                      maxLines: 6,
+                      decoration: const InputDecoration(
+                        hintText: 'Chapter ka text yahan likho...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
                 ),
-                keyboardType: TextInputType.url,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Cover image URL is required.';
-                  final uri = Uri.tryParse(v.trim());
-                  if (uri == null || !uri.hasScheme) return 'Enter a valid URL.';
-                  return null;
-                },
-              ),
-            ],
+              );
+            }),
+            OutlinedButton.icon(
+              onPressed: _addChapterField,
+              icon: const Icon(Icons.add),
+              label: const Text('Add chapter'),
+            ),
 
             const SizedBox(height: 28),
             FilledButton(
               onPressed: _submitting ? null : _submit,
               child: _submitting
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(_type == _ContentType.story ? 'Add Story' : 'Add Documentary'),
             ),
           ],
