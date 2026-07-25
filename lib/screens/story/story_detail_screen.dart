@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_app/models/comment_model.dart';
 import 'package:my_app/models/story_content_model.dart';
 export 'package:my_app/models/story_content_model.dart' show StoryChapter;
 import 'package:my_app/models/story_interaction_model.dart';
@@ -30,11 +31,174 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
   // local toggle for the whole screen, shown at the end of whichever
   // episode is currently open.
   bool _dislikedLocally = false;
+
+  // Comments -- story-wide (not per-episode), infinite scroll.
+  final _commentController = TextEditingController();
+  final _scrollController = ScrollController();
+  final List<CommentModel> _comments = [];
+  int _commentsPage = 1;
+  bool _commentsHasMore = true;
+  bool _commentsInitialLoading = true;
+  bool _commentsLoadingMore = false;
+  int _commentsTotalCount = 0;
+  bool _postingComment = false;
   
   @override
   void initState() {
     super.initState();
     _dataFuture = _load();
+    _loadCommentsInitial();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_commentsHasMore || _commentsLoadingMore || _commentsInitialLoading) return;
+    final threshold = _scrollController.position.maxScrollExtent - 400;
+    if (_scrollController.position.pixels >= threshold) {
+      _loadCommentsMore();
+    }
+  }
+
+  Future<void> _loadCommentsInitial() async {
+    setState(() => _commentsInitialLoading = true);
+    try {
+      final result = await _storyService.fetchComments(widget.storyId, page: 1);
+      if (!mounted) return;
+      setState(() {
+        _comments
+          ..clear()
+          ..addAll(result.data);
+        _commentsHasMore = result.hasMore;
+        _commentsTotalCount = result.totalCount;
+        _commentsPage = 1;
+        _commentsInitialLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _commentsInitialLoading = false);
+    }
+  }
+
+  Future<void> _loadCommentsMore() async {
+    setState(() => _commentsLoadingMore = true);
+    try {
+      final nextPage = _commentsPage + 1;
+      final result = await _storyService.fetchComments(widget.storyId, page: nextPage);
+      if (!mounted) return;
+      setState(() {
+        _comments.addAll(result.data);
+        _commentsHasMore = result.hasMore;
+        _commentsPage = nextPage;
+        _commentsLoadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _commentsLoadingMore = false);
+    }
+  }
+
+  Future<void> _submitComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty || _postingComment) return;
+    setState(() => _postingComment = true);
+    try {
+      final comment = await _storyService.postComment(widget.storyId, text);
+      if (!mounted) return;
+      setState(() {
+        _comments.insert(0, comment);
+        _commentsTotalCount += 1;
+        _commentController.clear();
+        _postingComment = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _postingComment = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  String _timeAgoShort(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inDays > 0) return '${diff.inDays}d ago';
+    if (diff.inHours > 0) return '${diff.inHours}h ago';
+    if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+    return 'just now';
+  }
+
+  Widget _buildCommentsSection(BuildContext context, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(),
+          const SizedBox(height: 16),
+          Text(
+            'Comments ($_commentsTotalCount)',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _commentController,
+                  minLines: 1,
+                  maxLines: 4,
+                  decoration: const InputDecoration(hintText: 'Write a comment...', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                onPressed: _postingComment ? null : _submitComment,
+                icon: _postingComment
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.send),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (_commentsInitialLoading)
+            const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+          else if (_comments.isEmpty)
+            Text('No comments yet -- be the first!', style: TextStyle(color: colorScheme.onSurfaceVariant))
+          else ...[
+            for (final comment in _comments)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(comment.username, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(width: 8),
+                        Text(
+                          _timeAgoShort(comment.createdAt),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(comment.text),
+                  ],
+                ),
+              ),
+            if (_commentsLoadingMore)
+              const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator())),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<_DetailData> _load() async {
@@ -150,6 +314,7 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
           final displayedProgress = _pendingProgress ?? interactions.progress;
 
           return CustomScrollView(
+            controller: _scrollController,
             slivers: [
               SliverAppBar(
                 expandedHeight: bannerHeight,
@@ -290,6 +455,7 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                         data.contentError ?? 'Text load nahi ho paya.',
                         style: TextStyle(color: colorScheme.onSurfaceVariant),
                       ),
+                    _buildCommentsSection(context, colorScheme),
                   ]),
                 ),
               ),
