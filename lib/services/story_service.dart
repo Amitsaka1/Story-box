@@ -6,6 +6,7 @@ import 'package:my_app/models/category_model.dart';
 import 'package:my_app/models/story_content_model.dart';
 import 'package:my_app/models/story_interaction_model.dart';
 import 'package:my_app/models/story_model.dart';
+import 'package:my_app/models/comment_model.dart';
 
 class StoryService {
   final _dio = ApiClient.instance.dio;
@@ -205,6 +206,35 @@ class StoryService {
       await _dio.put('/stories/$storyId/progress', data: {'progress': progress});
     } on DioException catch (e) {
       throw _extractError(e, 'Could not save your progress.');
+    }
+  }
+
+  /// Story-wide comments, paginated -- newest first.
+  Future<({List<CommentModel> data, bool hasMore, int totalCount})> fetchComments(
+    String storyId, {
+    required int page,
+    int limit = 20,
+  }) async {
+    try {
+      final res = await _dio.get('/stories/$storyId/comments', queryParameters: {'page': page, 'limit': limit});
+      final json = res.data as Map<String, dynamic>;
+      final list = json['data'] as List;
+      return (
+        data: list.map((j) => CommentModel.fromJson(j as Map<String, dynamic>)).toList(),
+        hasMore: json['hasMore'] as bool,
+        totalCount: json['totalCount'] as int,
+      );
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load comments.');
+    }
+  }
+
+  Future<CommentModel> postComment(String storyId, String text) async {
+    try {
+      final res = await _dio.post('/stories/$storyId/comments', data: {'text': text});
+      return CommentModel.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not post your comment.');
     }
   }
 }
