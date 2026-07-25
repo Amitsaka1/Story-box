@@ -38,6 +38,7 @@ class StoryService {
     String? categoryId,
     DateTime? from,
     DateTime? to,
+    String? search,
   }) async {
     try {
       final res = await _dio.get('/stories', queryParameters: {
@@ -46,6 +47,7 @@ class StoryService {
         if (categoryId != null) 'categoryId': categoryId,
         if (from != null) 'from': from.toIso8601String(),
         if (to != null) 'to': to.toIso8601String(),
+        if (search != null && search.isNotEmpty) 'search': search,
       });
       final json = res.data as Map<String, dynamic>;
       final list = json['data'] as List;
@@ -74,6 +76,15 @@ class StoryService {
       );
     } on DioException catch (e) {
       throw _extractError(e, 'Could not load history.');
+    }
+  }
+
+  /// Admin only -- backend rejects this with 403 for non-admin users.
+  Future<void> deleteStory(String id) async {
+    try {
+      await _dio.delete('/stories/$id');
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not delete story.');
     }
   }
 
