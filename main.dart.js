@@ -104748,18 +104748,20 @@ break
 case 6:case 1:return A.w(q,r)
 case 2:return A.v(o.at(-1),r)}})
 return A.x($async$Br,r)},
-By(a,b,c,d,e){return this.apq(a,b,c,d,e)},
-apq(a,b,c,d,e){var s=0,r=A.y(t.FS),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f
-var $async$By=A.z(function(a0,a1){if(a0===1){o.push(a1)
-s=p}while(true)switch(s){case 0:p=4
+By(a,b,c,d,e){var s="ongoing"
+return this.apq(a,b,c,d,e)},
+apq(a,b,c,d,a0){var s=0,r=A.y(t.FS),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e
+var $async$By=A.z(function(a1,a2){if(a1===1){o.push(a2)
+s=p}while(true)switch(s){case 0:f="ongoing"
+p=4
 j=t.z
-i=A.ac(["title",e,"categoryId",a,"chapters",B.cn.L9(b,null),"cover",A.b5G(c,d)],t.N,j)
+i=A.ac(["title",a0,"categoryId",a,"chapters",B.cn.L9(b,null),"status",f,"cover",A.b5G(c,d)],t.N,j)
 h=new A.BT(A.a([],t.Iq),A.a([],t.cS))
 h.acD(i,B.mA)
 m=h
 s=7
 return A.t(n.a.kF("/stories",m,j),$async$By)
-case 7:l=a1
+case 7:l=a2
 j=A.Ff(t.P.a(l.a))
 q=j
 s=1
@@ -104768,10 +104770,10 @@ p=2
 s=6
 break
 case 4:p=3
-f=o.pop()
-j=A.Z(f)
+e=o.pop()
+j=A.Z(e)
 if(j instanceof A.bW){k=j
-throw A.f(n.hG(k,"Could not create story."))}else throw f
+throw A.f(n.hG(k,"Could not create story."))}else throw e
 s=6
 break
 case 3:s=2
