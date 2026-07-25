@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/providers/auth_provider.dart';
 import 'package:my_app/screens/admin/add_content_screen.dart';
+import 'package:my_app/screens/admin/manage_content_screen.dart';
 import 'package:my_app/widgets/dashboard/dashboard_app_bar.dart';
 import 'package:my_app/widgets/dashboard/dashboard_bottom_nav.dart';
 import 'package:my_app/screens/story/trending_screen.dart';
@@ -54,6 +55,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openManageContent() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ManageContentScreen()),
+    );
+  }
+
+  void _showAdminMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add),
+              title: const Text('Add Content'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _openAddContent();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.list_alt),
+              title: const Text('Manage Content'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _openManageContent();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Trending icon only makes sense on the Story tab (index 0).
@@ -78,9 +114,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       floatingActionButton: (isAdmin && isContentTab)
           ? FloatingActionButton.extended(
-              onPressed: _openAddContent,
-              icon: const Icon(Icons.add),
-              label: const Text('Add'),
+              onPressed: _showAdminMenu,
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              label: const Text('Admin'),
             )
           : null,
       bottomNavigationBar: DashboardBottomNav(
