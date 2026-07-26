@@ -147,6 +147,41 @@ class StoryService {
       throw 'Could not load the story text.';
     }
   }
+  /// Admin only -- partial update; only send what changed. chapters,
+  /// if provided, gets re-uploaded to R2 and contentUrl updated.
+  Future<void> updateStory(
+    String id, {
+    String? title,
+    String? categoryId,
+    String? status,
+    List<Map<String, dynamic>>? chapters,
+  }) async {
+    try {
+      await _dio.patch('/stories/$id', data: {
+        if (title != null) 'title': title,
+        if (categoryId != null) 'categoryId': categoryId,
+        if (status != null) 'status': status,
+        if (chapters != null) 'chapters': chapters,
+      });
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not update story.');
+    }
+  }
+
+  /// Admin only -- replaces the cover image (old one deleted from R2
+  /// server-side).
+  Future<String> replaceCover(String id, Uint8List coverBytes, String coverFilename) async {
+    try {
+      final formData = FormData.fromMap({
+        'cover': MultipartFile.fromBytes(coverBytes, filename: coverFilename),
+      });
+      final res = await _dio.post('/stories/$id/cover', data: formData);
+      return res.data['coverImageUrl'] as String;
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not update cover image.');
+    }
+  }
+
   /// Single story by id -- used by the story detail screen.
   Future<StoryModel> fetchStoryById(String id) async {
     try {
