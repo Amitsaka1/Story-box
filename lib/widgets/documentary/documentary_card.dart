@@ -94,6 +94,23 @@ class DocumentaryCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: documentary.status == 'completed'
+                            ? Colors.green.withOpacity(0.85)
+                            : Colors.blueAccent.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        documentary.status == 'completed' ? 'Completed' : 'Ongoing',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
