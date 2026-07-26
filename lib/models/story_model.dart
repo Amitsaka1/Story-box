@@ -61,6 +61,8 @@ class StoryModel {
       coverImageUrl: json['coverImageUrl'] as String,
       contentUrl: json['contentUrl'] as String? ?? '',
       category: json['category'] as String,
+      categoryId: json['categoryId'] as String? ?? '',
+      status: json['status'] as String? ?? 'ongoing',
       rating: (json['rating'] as num).toDouble(),
       viewCount: json['viewCount'] as int,
       likeCount: json['likeCount'] as int,
