@@ -57,6 +57,40 @@ class DocumentaryService {
       throw _extractError(e, 'Could not load documentaries.');
     }
   }
+  /// Admin only -- partial update; only send what changed.
+  Future<void> updateDocumentary(
+    String id, {
+    String? title,
+    String? categoryId,
+    String? status,
+    List<Map<String, dynamic>>? chapters,
+  }) async {
+    try {
+      await _dio.patch('/documentaries/$id', data: {
+        if (title != null) 'title': title,
+        if (categoryId != null) 'categoryId': categoryId,
+        if (status != null) 'status': status,
+        if (chapters != null) 'chapters': chapters,
+      });
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not update documentary.');
+    }
+  }
+
+  /// Admin only -- replaces the cover image (old one deleted from R2
+  /// server-side).
+  Future<String> replaceCover(String id, Uint8List coverBytes, String coverFilename) async {
+    try {
+      final formData = FormData.fromMap({
+        'cover': MultipartFile.fromBytes(coverBytes, filename: coverFilename),
+      });
+      final res = await _dio.post('/documentaries/$id/cover', data: formData);
+      return res.data['coverImageUrl'] as String;
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not update cover image.');
+    }
+  }
+
   /// Single documentary by id -- used by the documentary detail screen.
   Future<DocumentaryModel> fetchDocumentaryById(String id) async {
     try {
