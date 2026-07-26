@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:my_app/screens/admin/edit_content_screen.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/models/story_model.dart';
 import 'package:my_app/services/documentary_service.dart';
@@ -170,12 +171,10 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
     );
 
     if (action == 'edit') {
-      // Edit screen (chapters add/remove, thumbnail replace) is the
-      // next step -- not wired yet.
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Edit screen coming in the next step.')),
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => EditContentScreen(isStory: _type == _ContentType.story, id: id)),
       );
+      if (saved == true) _loadInitial();
     } else if (action == 'delete') {
       await _confirmDelete(id: id, title: title);
     }
