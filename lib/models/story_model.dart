@@ -6,7 +6,9 @@ class StoryModel {
   final String coverImageUrl;
   final String contentUrl;
   final String category;
-  final double rating; // 0.0 - 5.0
+  final String categoryId;
+  final String status; // "ongoing" | "completed"
+  final double rating;
   final int viewCount;
   final int likeCount;
   final int commentCount;
@@ -35,6 +37,8 @@ class StoryModel {
     required this.coverImageUrl,
     required this.contentUrl,
     required this.category,
+    required this.categoryId,
+    required this.status,
     required this.rating,
     required this.viewCount,
     required this.likeCount,
