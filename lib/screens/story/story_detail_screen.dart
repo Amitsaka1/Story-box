@@ -46,6 +46,11 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
   void initState() {
     super.initState();
     _dataFuture = _load();
+    // Resume into whichever episode the reader last had open.
+    _dataFuture.then((data) {
+      if (!mounted) return;
+      setState(() => _selectedChapterNo = data.interactions.lastChapterNo);
+    });
     _loadCommentsInitial();
     _scrollController.addListener(_onScroll);
   }
@@ -259,22 +264,27 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
     }
   }
 
-  Future<void> _saveProgress(_DetailData data, double progress) async {
+  // Called automatically whenever the reader opens an episode (top row
+  // or the "All Episodes" panel) -- no manual slider/buttons anymore.
+  // progress = chapterNo/totalChapters; "completed" comes back from the
+  // backend, which combines "last episode reached" with the story's
+  // own ongoing/completed status.
+  Future<void> _trackProgress(_DetailData data, int chapterNo, int totalChapters) async {
+    final progress = totalChapters > 0 ? chapterNo / totalChapters : 0.0;
     try {
-      await _storyService.updateProgress(widget.storyId, progress);
+      final completed = await _storyService.updateProgress(widget.storyId, progress, lastChapterNo: chapterNo);
+      if (!mounted) return;
       setState(() {
-        _pendingProgress = null;
         _dataFuture = Future.value(data.copyWith(
-          interactions: data.interactions.copyWith(progress: progress, completed: progress >= 0.98),
+          interactions: data.interactions.copyWith(progress: progress, completed: completed, lastChapterNo: chapterNo),
         ));
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _pendingProgress = null);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } catch (_) {
+      // Silent -- a failed progress save shouldn't interrupt reading
+      // with an error popup. It'll just try again next episode switch.
     }
   }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -310,7 +320,6 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
           final colorScheme = Theme.of(context).colorScheme;
           final screenWidth = MediaQuery.of(context).size.width;
           final bannerHeight = screenWidth * 1.5;
-          final displayedProgress = _pendingProgress ?? interactions.progress;
 
           return CustomScrollView(
             controller: _scrollController,
