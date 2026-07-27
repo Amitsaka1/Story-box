@@ -382,6 +382,14 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                         Icon(Icons.favorite, size: 16, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 2),
                         Text(StoryModel.formatCount(data.liveLikeCount ?? story.likeCount)),
+                        if (interactions.completed) ...[
+                          const SizedBox(width: 12),
+                          Chip(
+                            label: const Text('Finished'),
+                            avatar: const Icon(Icons.check_circle, size: 14),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 20),
