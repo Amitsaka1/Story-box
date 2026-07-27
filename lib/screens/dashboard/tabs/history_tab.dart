@@ -1,12 +1,54 @@
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/models/story_model.dart';
+import 'package:my_app/screens/documentary/documentary_detail_screen.dart';
 import 'package:my_app/screens/story/story_detail_screen.dart';
+import 'package:my_app/services/documentary_service.dart';
 import 'package:my_app/services/story_service.dart';
-import 'package:my_app/widgets/story/story_card.dart';
 
-/// Real "recently viewed" history, backed by GET /stories/history --
-/// server-side paginated infinite scroll, most recently viewed first.
+enum _HistorySection { watching, complete }
+
+/// A single row shown in either section -- wraps either a StoryModel or
+/// a DocumentaryModel so both types render in one merged, sorted list.
+class _HistoryItem {
+  final String id;
+  final String title;
+  final String coverImageUrl;
+  final double watchProgress;
+  final DateTime lastWatchedAt;
+  final bool isStory;
+
+  const _HistoryItem({
+    required this.id,
+    required this.title,
+    required this.coverImageUrl,
+    required this.watchProgress,
+    required this.lastWatchedAt,
+    required this.isStory,
+  });
+
+  factory _HistoryItem.fromStory(StoryModel s) => _HistoryItem(
+        id: s.id,
+        title: s.title,
+        coverImageUrl: s.coverImageUrl,
+        watchProgress: s.watchProgress,
+        lastWatchedAt: s.lastWatchedAt ?? s.addedAt,
+        isStory: true,
+      );
+
+  factory _HistoryItem.fromDocumentary(DocumentaryModel d) => _HistoryItem(
+        id: d.id,
+        title: d.title,
+        coverImageUrl: d.coverImageUrl,
+        watchProgress: d.watchProgress,
+        lastWatchedAt: d.lastWatchedAt ?? d.addedAt,
+        isStory: false,
+      );
+}
+
+/// History: two sections -- Watching (started but not finished) and
+/// Complete (finished, per the ongoing/completed business rule) --
+/// each merging Story + Documentary together, most recent first.
 class HistoryTab extends StatefulWidget {
   const HistoryTab({super.key});
 
@@ -16,190 +58,188 @@ class HistoryTab extends StatefulWidget {
 
 class _HistoryTabState extends State<HistoryTab> {
   final _storyService = StoryService();
-  final _scrollController = ScrollController();
-  static const int _pageSize = 20;
+  final _documentaryService = DocumentaryService();
 
-  final List<StoryModel> _stories = [];
-  int _page = 1;
-  bool _hasMore = true;
-  bool _initialLoading = true;
-  bool _loadingMore = false;
-  Object? _error;
+  _HistorySection _section = _HistorySection.watching;
+  late Future<List<_HistoryItem>> _itemsFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadInitial();
-    _scrollController.addListener(_onScroll);
+    _itemsFuture = _load();
   }
 
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
-  }
+  Future<List<_HistoryItem>> _load() async {
+    final List<StoryModel> stories;
+    final List<DocumentaryModel> documentaries;
 
-  void _onScroll() {
-    if (!_hasMore || _loadingMore || _initialLoading) return;
-    final threshold = _scrollController.position.maxScrollExtent - 400;
-    if (_scrollController.position.pixels >= threshold) {
-      _loadMore();
+    if (_section == _HistorySection.watching) {
+      final results = await Future.wait([_storyService.fetchWatching(), _documentaryService.fetchWatching()]);
+      stories = results[0] as List<StoryModel>;
+      documentaries = results[1] as List<DocumentaryModel>;
+    } else {
+      final results = await Future.wait([_storyService.fetchCompleted(), _documentaryService.fetchCompleted()]);
+      stories = results[0] as List<StoryModel>;
+      documentaries = results[1] as List<DocumentaryModel>;
     }
+
+    final items = [
+      ...stories.map(_HistoryItem.fromStory),
+      ...documentaries.map(_HistoryItem.fromDocumentary),
+    ];
+    items.sort((a, b) => b.lastWatchedAt.compareTo(a.lastWatchedAt));
+    return items;
   }
 
-  Future<void> _loadInitial() async {
+  void _onSectionChanged(Set<_HistorySection> selection) {
     setState(() {
-      _initialLoading = true;
-      _error = null;
-      _page = 1;
-      _hasMore = true;
-      _stories.clear();
+      _section = selection.first;
+      _itemsFuture = _load();
     });
-    try {
-      final result = await _storyService.fetchHistoryPaged(page: 1, limit: _pageSize);
-      if (!mounted) return;
-      setState(() {
-        _stories.addAll(result.data);
-        _hasMore = result.hasMore;
-        _initialLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e;
-        _initialLoading = false;
-      });
-    }
   }
 
-  Future<void> _loadMore() async {
-    setState(() => _loadingMore = true);
-    try {
-      final nextPage = _page + 1;
-      final result = await _storyService.fetchHistoryPaged(page: nextPage, limit: _pageSize);
-      if (!mounted) return;
-      setState(() {
-        _stories.addAll(result.data);
-        _hasMore = result.hasMore;
-        _page = nextPage;
-        _loadingMore = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loadingMore = false);
-    }
-  }
-
-  String _timeAgo(DateTime time) {
-    final diff = DateTime.now().difference(time);
-    if (diff.inDays > 0) return 'story.days_ago'.tr(namedArgs: {'count': '${diff.inDays}'});
-    if (diff.inHours > 0) return 'story.hours_ago'.tr(namedArgs: {'count': '${diff.inHours}'});
-    return 'story.minutes_ago'.tr(namedArgs: {'count': '${diff.inMinutes}'});
-  }
-
-  void _openStory(StoryModel story) {
+  void _openItem(_HistoryItem item) {
     Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => StoryDetailScreen(storyId: story.id)))
-        .then((_) => _loadInitial());
+        .push(MaterialPageRoute(
+          builder: (_) => item.isStory
+              ? StoryDetailScreen(storyId: item.id)
+              : DocumentaryDetailScreen(documentaryId: item.id),
+        ))
+        .then((_) => setState(() => _itemsFuture = _load()));
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (_initialLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.cloud_off, size: 48, color: colorScheme.outline),
-              const SizedBox(height: 12),
-              Text('$_error', textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: _loadInitial, child: const Text('Retry')),
-            ],
-          ),
-        ),
-      );
-    }
-
     return RefreshIndicator(
-      onRefresh: _loadInitial,
+      onRefresh: () async => setState(() => _itemsFuture = _load()),
       child: CustomScrollView(
-        controller: _scrollController,
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
             sliver: SliverToBoxAdapter(
-              child: Text(
-                'history.recently_viewed'.tr(),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              child: SegmentedButton<_HistorySection>(
+                segments: const [
+                  ButtonSegment(value: _HistorySection.watching, label: Text('Watching'), icon: Icon(Icons.play_circle_outline)),
+                  ButtonSegment(value: _HistorySection.complete, label: Text('Complete'), icon: Icon(Icons.check_circle_outline)),
+                ],
+                selected: {_section},
+                onSelectionChanged: _onSectionChanged,
               ),
             ),
           ),
-          if (_stories.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.history_outlined, size: 64, color: colorScheme.outline),
-                      const SizedBox(height: 16),
-                      Text('history.no_history_title'.tr(), style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 8),
-                      Text(
-                        'history.no_history_subtitle'.tr(),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+          FutureBuilder<List<_HistoryItem>>(
+            future: _itemsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('${snapshot.error}'),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: () => setState(() => _itemsFuture = _load()),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              final items = snapshot.data ?? const [];
+              if (items.isEmpty) {
+                return SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _section == _HistorySection.watching ? Icons.play_circle_outline : Icons.check_circle_outline,
+                            size: 64,
+                            color: colorScheme.outline,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _section == _HistorySection.watching ? 'Nothing in progress yet' : 'Nothing finished yet',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Things you read or watch will show up here.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ),
+                );
+              }
+
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final item = items[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              item.coverImageUrl,
+                              width: 52,
+                              height: 72,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stack) => Container(
+                                width: 52,
+                                height: 72,
+                                color: colorScheme.surfaceContainerHighest,
+                                child: Icon(Icons.broken_image_outlined, size: 18, color: colorScheme.outline),
+                              ),
+                            ),
+                          ),
+                          title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(item.isStory ? 'Story' : 'Documentary'),
+                          trailing: _section == _HistorySection.watching
+                              ? SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      CircularProgressIndicator(value: item.watchProgress, strokeWidth: 3),
+                                      Text('${(item.watchProgress * 100).round()}%', style: const TextStyle(fontSize: 10)),
+                                    ],
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle, color: Colors.green),
+                          onTap: () => _openItem(item),
+                        ),
+                      );
+                    },
+                    childCount: items.length,
                   ),
                 ),
-              ),
-            )
-          else ...[
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.48,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final story = _stories[index];
-                    return StoryCard(
-                      story: story,
-                      statLabel: _timeAgo(story.viewedAt ?? story.addedAt),
-                      statIcon: Icons.visibility_outlined,
-                      onTap: () => _openStory(story),
-                    );
-                  },
-                  childCount: _stories.length,
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: _loadingMore
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  : const SizedBox(height: 20),
-            ),
-          ],
+              );
+            },
+          ),
         ],
       ),
     );
