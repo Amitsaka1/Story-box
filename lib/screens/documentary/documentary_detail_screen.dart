@@ -18,7 +18,6 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
   final _documentaryService = DocumentaryService();
 
   late Future<_DetailData> _dataFuture;
-  double? _pendingProgress;
 
   int _selectedChapterNo = 1;
   bool _showAllEpisodesPanel = false;
@@ -38,10 +37,14 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
   void initState() {
     super.initState();
     _dataFuture = _load();
+    _dataFuture.then((data) {
+      if (!mounted) return;
+      setState(() => _selectedChapterNo = data.interactions.lastChapterNo);
+    });
     _loadCommentsInitial();
     _scrollController.addListener(_onScroll);
   }
-
+  
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
@@ -248,19 +251,19 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
     }
   }
 
-  Future<void> _saveProgress(_DetailData data, double progress) async {
+  Future<void> _trackProgress(_DetailData data, int chapterNo, int totalChapters) async {
+    final progress = totalChapters > 0 ? chapterNo / totalChapters : 0.0;
     try {
-      await _documentaryService.updateProgress(widget.documentaryId, progress);
+      final completed =
+          await _documentaryService.updateProgress(widget.documentaryId, progress, lastChapterNo: chapterNo);
+      if (!mounted) return;
       setState(() {
-        _pendingProgress = null;
         _dataFuture = Future.value(data.copyWith(
-          interactions: data.interactions.copyWith(progress: progress, completed: progress >= 0.98),
+          interactions: data.interactions.copyWith(progress: progress, completed: completed, lastChapterNo: chapterNo),
         ));
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _pendingProgress = null);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } catch (_) {
+      // Silent -- same reasoning as the story detail screen.
     }
   }
 
@@ -299,7 +302,6 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
           final colorScheme = Theme.of(context).colorScheme;
           final screenWidth = MediaQuery.of(context).size.width;
           final bannerHeight = screenWidth * 1.5;
-          final displayedProgress = _pendingProgress ?? interactions.progress;
 
           return CustomScrollView(
             controller: _scrollController,
@@ -362,6 +364,14 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
                         Icon(Icons.favorite, size: 16, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 2),
                         Text(DocumentaryModel.formatCount(data.liveLikeCount ?? documentary.likeCount)),
+                        if (interactions.completed) ...[
+                          const SizedBox(width: 12),
+                          Chip(
+                            label: const Text('Finished'),
+                            avatar: const Icon(Icons.check_circle, size: 14),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 20),
