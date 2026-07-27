@@ -399,45 +399,7 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
                         }),
                       ],
                     ),
-                    const SizedBox(height: 28),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Your progress', style: Theme.of(context).textTheme.titleSmall),
-                        if (interactions.completed)
-                          Chip(
-                            label: const Text('Finished'),
-                            avatar: const Icon(Icons.check_circle, size: 16),
-                            visualDensity: VisualDensity.compact,
-                          )
-                        else
-                          Text('${(displayedProgress * 100).round()}%'),
-                      ],
-                    ),
-                    Slider(
-                      value: displayedProgress,
-                      onChanged: (v) => setState(() => _pendingProgress = v),
-                      onChangeEnd: (v) => _saveProgress(data, v),
-                    ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: displayedProgress > 0 ? null : () => _saveProgress(data, 0.05),
-                            child: const Text('Start'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: interactions.completed ? null : () => _saveProgress(data, 1.0),
-                            child: const Text('Mark as Finished'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
                     const Divider(),
                     const SizedBox(height: 16),
                     Text('Documentary', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
