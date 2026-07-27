@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:my_app/models/comment_model.dart';
 import 'package:my_app/models/story_content_model.dart';
-export 'package:my_app/models/story_content_model.dart' show StoryChapter;
 import 'package:my_app/models/story_interaction_model.dart';
 import 'package:my_app/models/story_model.dart';
+import 'package:my_app/screens/story/story_episode_screen.dart';
 import 'package:my_app/services/story_service.dart';
 
 class StoryDetailScreen extends StatefulWidget {
@@ -20,189 +19,10 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
 
   late Future<_DetailData> _dataFuture;
 
-  // Episode selector state -- which episode's text is currently shown,
-  // and whether the "All Episodes" panel is expanded. The panel stays
-  // open across episode picks until manually closed (per product spec).
-  int _selectedChapterNo = 1;
-  bool _showAllEpisodesPanel = false;
-
-  // Dislike is purely cosmetic (confirmed: no backend effect) -- one
-  // local toggle for the whole screen, shown at the end of whichever
-  // episode is currently open.
-  bool _dislikedLocally = false;
-
-  // Comments -- story-wide (not per-episode), infinite scroll.
-  final _commentController = TextEditingController();
-  final _scrollController = ScrollController();
-  final List<CommentModel> _comments = [];
-  int _commentsPage = 1;
-  bool _commentsHasMore = true;
-  bool _commentsInitialLoading = true;
-  bool _commentsLoadingMore = false;
-  int _commentsTotalCount = 0;
-  bool _postingComment = false;
-  
   @override
   void initState() {
     super.initState();
     _dataFuture = _load();
-    // Resume into whichever episode the reader last had open.
-    _dataFuture.then((data) {
-      if (!mounted) return;
-      setState(() => _selectedChapterNo = data.interactions.lastChapterNo);
-    });
-    _loadCommentsInitial();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_commentsHasMore || _commentsLoadingMore || _commentsInitialLoading) return;
-    final threshold = _scrollController.position.maxScrollExtent - 400;
-    if (_scrollController.position.pixels >= threshold) {
-      _loadCommentsMore();
-    }
-  }
-
-  Future<void> _loadCommentsInitial() async {
-    setState(() => _commentsInitialLoading = true);
-    try {
-      final result = await _storyService.fetchComments(widget.storyId, page: 1);
-      if (!mounted) return;
-      setState(() {
-        _comments
-          ..clear()
-          ..addAll(result.data);
-        _commentsHasMore = result.hasMore;
-        _commentsTotalCount = result.totalCount;
-        _commentsPage = 1;
-        _commentsInitialLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _commentsInitialLoading = false);
-    }
-  }
-
-  Future<void> _loadCommentsMore() async {
-    setState(() => _commentsLoadingMore = true);
-    try {
-      final nextPage = _commentsPage + 1;
-      final result = await _storyService.fetchComments(widget.storyId, page: nextPage);
-      if (!mounted) return;
-      setState(() {
-        _comments.addAll(result.data);
-        _commentsHasMore = result.hasMore;
-        _commentsPage = nextPage;
-        _commentsLoadingMore = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _commentsLoadingMore = false);
-    }
-  }
-
-  Future<void> _submitComment() async {
-    final text = _commentController.text.trim();
-    if (text.isEmpty || _postingComment) return;
-    setState(() => _postingComment = true);
-    try {
-      final comment = await _storyService.postComment(widget.storyId, text);
-      if (!mounted) return;
-      setState(() {
-        _comments.insert(0, comment);
-        _commentsTotalCount += 1;
-        _commentController.clear();
-        _postingComment = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _postingComment = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
-
-  String _timeAgoShort(DateTime time) {
-    final diff = DateTime.now().difference(time);
-    if (diff.inDays > 0) return '${diff.inDays}d ago';
-    if (diff.inHours > 0) return '${diff.inHours}h ago';
-    if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
-    return 'just now';
-  }
-
-  Widget _buildCommentsSection(BuildContext context, ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Divider(),
-          const SizedBox(height: 16),
-          Text(
-            'Comments ($_commentsTotalCount)',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _commentController,
-                  minLines: 1,
-                  maxLines: 4,
-                  decoration: const InputDecoration(hintText: 'Write a comment...', border: OutlineInputBorder()),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                onPressed: _postingComment ? null : _submitComment,
-                icon: _postingComment
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.send),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          if (_commentsInitialLoading)
-            const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-          else if (_comments.isEmpty)
-            Text('No comments yet -- be the first!', style: TextStyle(color: colorScheme.onSurfaceVariant))
-          else ...[
-            for (final comment in _comments)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(comment.username, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        const SizedBox(width: 8),
-                        Text(
-                          _timeAgoShort(comment.createdAt),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(comment.text),
-                  ],
-                ),
-              ),
-            if (_commentsLoadingMore)
-              const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator())),
-          ],
-        ],
-      ),
-    );
   }
 
   Future<_DetailData> _load() async {
@@ -210,9 +30,6 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
     final interactions = await _storyService.fetchInteractions(widget.storyId);
     final viewCount = await _storyService.registerView(widget.storyId);
 
-    // Content fetch alag try/catch me -- agar CDN file missing/purani
-    // story me contentUrl na ho, poora screen crash nahi hona chahiye,
-    // bas "text load nahi ho paya" dikhna chahiye.
     StoryContentModel? content;
     String? contentError;
     if (story.contentUrl.isNotEmpty) {
@@ -264,27 +81,22 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
     }
   }
 
-  // Called automatically whenever the reader opens an episode (top row
-  // or the "All Episodes" panel) -- no manual slider/buttons anymore.
-  // progress = chapterNo/totalChapters; "completed" comes back from the
-  // backend, which combines "last episode reached" with the story's
-  // own ongoing/completed status.
-  Future<void> _trackProgress(_DetailData data, int chapterNo, int totalChapters) async {
-    final progress = totalChapters > 0 ? chapterNo / totalChapters : 0.0;
-    try {
-      final completed = await _storyService.updateProgress(widget.storyId, progress, lastChapterNo: chapterNo);
-      if (!mounted) return;
-      setState(() {
-        _dataFuture = Future.value(data.copyWith(
-          interactions: data.interactions.copyWith(progress: progress, completed: completed, lastChapterNo: chapterNo),
-        ));
-      });
-    } catch (_) {
-      // Silent -- a failed progress save shouldn't interrupt reading
-      // with an error popup. It'll just try again next episode switch.
-    }
+  // Opens the full-screen reader for one episode -- text + Like/Dislike
+  // + Comments all live there now (merged), not on this page.
+  void _openEpisode(_DetailData data, StoryChapter chapter, int totalChapters) {
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+          builder: (_) => StoryEpisodeScreen(
+            storyId: widget.storyId,
+            chapterNo: chapter.chapterNo,
+            chapterText: chapter.text,
+            totalChapters: totalChapters,
+            isLiked: data.interactions.isLiked,
+          ),
+        ))
+        .then((_) => setState(() => _dataFuture = _load()));
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -322,7 +134,6 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
           final bannerHeight = screenWidth * 1.5;
 
           return CustomScrollView(
-            controller: _scrollController,
             slivers: [
               SliverAppBar(
                 expandedHeight: bannerHeight,
@@ -371,7 +182,7 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                       children: [
                         Chip(label: Text(story.category), visualDensity: VisualDensity.compact),
                         const SizedBox(width: 10),
-                        Icon(Icons.star, size: 16, color: Colors.amber),
+                        const Icon(Icons.star, size: 16, color: Colors.amber),
                         const SizedBox(width: 2),
                         Text((data.liveRating ?? story.rating).toStringAsFixed(1)),
                         const SizedBox(width: 12),
@@ -384,9 +195,9 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                         Text(StoryModel.formatCount(data.liveLikeCount ?? story.likeCount)),
                         if (interactions.completed) ...[
                           const SizedBox(width: 12),
-                          Chip(
-                            label: const Text('Finished'),
-                            avatar: const Icon(Icons.check_circle, size: 14),
+                          const Chip(
+                            label: Text('Finished'),
+                            avatar: Icon(Icons.check_circle, size: 14),
                             visualDensity: VisualDensity.compact,
                           ),
                         ],
@@ -409,28 +220,23 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                           return IconButton(
                             visualDensity: VisualDensity.compact,
                             onPressed: () => _rate(data, starIndex),
-                            icon: Icon(
-                              filled ? Icons.star : Icons.star_border,
-                              color: Colors.amber,
-                            ),
+                            icon: Icon(filled ? Icons.star : Icons.star_border, color: Colors.amber),
                           );
                         }),
                       ],
                     ),
-                    // ---------------- Story text (yahi neeche padhne wala part) ----------------
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 8),
                     const Divider(),
                     const SizedBox(height: 16),
                     Text('Story', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 16),
                     if (data.content != null)
-                      _buildEpisodeReader(context, data, colorScheme)
+                      _buildEpisodeGrid(context, data, data.content!.chapters, interactions.lastChapterNo)
                     else
                       Text(
                         data.contentError ?? 'Text load nahi ho paya.',
                         style: TextStyle(color: colorScheme.onSurfaceVariant),
                       ),
-                    _buildCommentsSection(context, colorScheme),
                   ]),
                 ),
               ),
@@ -441,164 +247,70 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
     );
   }
 
-  // Builds the episode number-selector row + "All Episodes" expandable
-  // panel + the currently-selected episode's text + Like/Dislike row.
-  Widget _buildEpisodeReader(BuildContext context, _DetailData data, ColorScheme colorScheme) {
-    final chapters = data.content!.chapters;
+  Widget _buildEpisodeGrid(BuildContext context, _DetailData data, List<StoryChapter> chapters, int lastChapterNo) {
+    final colorScheme = Theme.of(context).colorScheme;
     if (chapters.isEmpty) {
       return Text('Is story me abhi koi episode nahi hai.', style: TextStyle(color: colorScheme.onSurfaceVariant));
     }
-
     final sorted = [...chapters]..sort((a, b) => a.chapterNo.compareTo(b.chapterNo));
-    final visibleCount = sorted.length > 10 ? 10 : sorted.length;
-    final hasMore = sorted.length > 10;
-    final selected = sorted.firstWhere(
-      (c) => c.chapterNo == _selectedChapterNo,
-      orElse: () => sorted.first,
-    );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 40,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              for (final chapter in sorted.take(visibleCount)) ...[
-                _EpisodeNumberButton(
-                  number: chapter.chapterNo,
-                  selected: chapter.chapterNo == _selectedChapterNo,
-                  onTap: () {
-                    setState(() => _selectedChapterNo = chapter.chapterNo);
-                    _trackProgress(data, chapter.chapterNo, sorted.length);
-                  },
-                ),
-                const SizedBox(width: 8),
-              ],
-              if (hasMore)
-                OutlinedButton(
-                  onPressed: () => setState(() => _showAllEpisodesPanel = true),
-                  child: const Text('More'),
-                ),
-            ],
-          ),
-        ),
-        if (_showAllEpisodesPanel) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: colorScheme.outlineVariant),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('All Episodes', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => setState(() => _showAllEpisodesPanel = false),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 8,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 1,
-                  ),
-                  itemCount: sorted.length,
-                  itemBuilder: (context, index) {
-                    final chapter = sorted[index];
-                    return _EpisodeNumberButton(
-                      number: chapter.chapterNo,
-                      selected: chapter.chapterNo == _selectedChapterNo,
-                      // Manual close only -- picking an episode here does
-                      // NOT auto-close the panel.
-                      onTap: () {
-                        setState(() => _selectedChapterNo = chapter.chapterNo);
-                        _trackProgress(data, chapter.chapterNo, sorted.length);
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 20),
-        Text(
-          'Chapter ${selected.chapterNo}',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          selected.text,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            FilledButton.tonalIcon(
-              onPressed: () => _toggleLike(data),
-              icon: Icon(data.interactions.isLiked ? Icons.favorite : Icons.favorite_border),
-              label: Text(data.interactions.isLiked ? 'Liked' : 'Like'),
-            ),
-            const SizedBox(width: 12),
-            // Cosmetic only -- confirmed no backend call, just a visual
-            // toggle so tapping it "feels" like something happened.
-            IconButton(
-              onPressed: () => setState(() => _dislikedLocally = !_dislikedLocally),
-              icon: Icon(_dislikedLocally ? Icons.thumb_down : Icons.thumb_down_outlined),
-              color: _dislikedLocally ? Theme.of(context).colorScheme.error : null,
-            ),
-          ],
-        ),
-      ],
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 2.0,
+      ),
+      itemCount: sorted.length,
+      itemBuilder: (context, index) {
+        final chapter = sorted[index];
+        return _EpisodeButton(
+          number: chapter.chapterNo,
+          // Last-opened episode gets a filled look so you can see
+          // where you left off, without forcing you back into it.
+          isLastOpened: chapter.chapterNo == lastChapterNo,
+          onTap: () => _openEpisode(data, chapter, sorted.length),
+        );
+      },
     );
   }
 }
 
-// Small reusable numbered button -- used both in the top row and inside
-// the "All Episodes" grid, so both look/behave identically.
-class _EpisodeNumberButton extends StatelessWidget {
+/// Sky-blue "Episode N" button -- tapping opens the full episode
+/// reader screen (text + Like/Dislike + Comments together there).
+class _EpisodeButton extends StatelessWidget {
+  static const _skyBlue = Color(0xFF29B6F6);
+
   final int number;
-  final bool selected;
+  final bool isLastOpened;
   final VoidCallback onTap;
 
-  const _EpisodeNumberButton({required this.number, required this.selected, required this.onTap});
+  const _EpisodeButton({required this.number, required this.isLastOpened, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: selected ? colorScheme.primary : colorScheme.surfaceContainerHighest,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 36,
-          height: 36,
-          child: Center(
-            child: Text(
-              '$number',
-              style: TextStyle(
-                color: selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+    if (isLastOpened) {
+      return FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(backgroundColor: _skyBlue, padding: const EdgeInsets.symmetric(horizontal: 4)),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text('Episode $number', style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
+      );
+    }
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: _skyBlue,
+        side: const BorderSide(color: _skyBlue),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text('Episode $number', style: const TextStyle(fontWeight: FontWeight.w600)),
       ),
     );
   }
