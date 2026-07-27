@@ -448,7 +448,10 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
                 _EpisodeNumberButton(
                   number: chapter.chapterNo,
                   selected: chapter.chapterNo == _selectedChapterNo,
-                  onTap: () => setState(() => _selectedChapterNo = chapter.chapterNo),
+                  onTap: () {
+                    setState(() => _selectedChapterNo = chapter.chapterNo);
+                    _trackProgress(data, chapter.chapterNo, sorted.length);
+                  },
                 ),
                 const SizedBox(width: 8),
               ],
@@ -498,7 +501,10 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
                     return _EpisodeNumberButton(
                       number: chapter.chapterNo,
                       selected: chapter.chapterNo == _selectedChapterNo,
-                      onTap: () => setState(() => _selectedChapterNo = chapter.chapterNo),
+                      onTap: () {
+                        setState(() => _selectedChapterNo = chapter.chapterNo);
+                        _trackProgress(data, chapter.chapterNo, sorted.length);
+                      },
                     );
                   },
                 ),
