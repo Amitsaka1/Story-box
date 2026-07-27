@@ -29,13 +29,14 @@ class DocumentaryInteractionModel {
     int? myRating,
     double? progress,
     bool? completed,
+    int? lastChapterNo,
   }) {
     return DocumentaryInteractionModel(
       isLiked: isLiked ?? this.isLiked,
       myRating: myRating ?? this.myRating,
       progress: progress ?? this.progress,
       completed: completed ?? this.completed,
-      lastChapterNo: lastChapterNo,
+      lastChapterNo: lastChapterNo ?? this.lastChapterNo,
     );
   }
 }
