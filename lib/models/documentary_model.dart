@@ -20,6 +20,10 @@ class DocumentaryModel {
   /// Only present when this came from GET /documentaries/history.
   final DateTime? viewedAt;
 
+  /// Only present when this came from GET /documentaries/watching or
+  /// GET /documentaries/completed.
+  final DateTime? lastWatchedAt;
+
   const DocumentaryModel({
     required this.id,
     required this.title,
