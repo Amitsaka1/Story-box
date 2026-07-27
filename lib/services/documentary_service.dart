@@ -165,9 +165,13 @@ class DocumentaryService {
     }
   }
 
-  Future<void> updateProgress(String documentaryId, double progress) async {
+  Future<bool> updateProgress(String documentaryId, double progress, {int? lastChapterNo}) async {
     try {
-      await _dio.put('/documentaries/$documentaryId/progress', data: {'progress': progress});
+      final res = await _dio.put('/documentaries/$documentaryId/progress', data: {
+        'progress': progress,
+        if (lastChapterNo != null) 'lastChapterNo': lastChapterNo,
+      });
+      return res.data['completed'] as bool;
     } on DioException catch (e) {
       throw _extractError(e, 'Could not save your progress.');
     }
