@@ -31,6 +31,10 @@ class StoryModel {
   /// null for every other endpoint (list/detail/watching).
   final DateTime? viewedAt;
 
+  /// Only present when this came from GET /stories/watching or
+  /// GET /stories/completed -- used to sort the History tab.
+  final DateTime? lastWatchedAt;
+
   const StoryModel({
     required this.id,
     required this.title,
@@ -47,6 +51,7 @@ class StoryModel {
     this.isWatching = false,
     this.watchProgress = 0.0,
     this.viewedAt,
+    this.lastWatchedAt,
   });
 
   /// Maps the JSON shape returned by GET /stories (list/detail) and
@@ -71,6 +76,7 @@ class StoryModel {
       isWatching: json['watchProgress'] != null,
       watchProgress: watchProgress,
       viewedAt: json['viewedAt'] != null ? DateTime.parse(json['viewedAt'] as String) : null,
+      lastWatchedAt: json['lastWatchedAt'] != null ? DateTime.parse(json['lastWatchedAt'] as String) : null,
     );
   }
 
