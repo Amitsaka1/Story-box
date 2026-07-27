@@ -40,8 +40,9 @@ class DocumentaryModel {
     this.isWatching = false,
     this.watchProgress = 0.0,
     this.viewedAt,
+    this.lastWatchedAt,
   });
-
+  
   factory DocumentaryModel.fromJson(Map<String, dynamic> json) {
     final watchProgress = json['watchProgress'] != null ? (json['watchProgress'] as num).toDouble() : 0.0;
     return DocumentaryModel(
@@ -60,6 +61,7 @@ class DocumentaryModel {
       isWatching: json['watchProgress'] != null,
       watchProgress: watchProgress,
       viewedAt: json['viewedAt'] != null ? DateTime.parse(json['viewedAt'] as String) : null,
+      lastWatchedAt: json['lastWatchedAt'] != null ? DateTime.parse(json['lastWatchedAt'] as String) : null,
     );
   }
 
