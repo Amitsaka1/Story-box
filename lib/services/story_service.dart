@@ -248,10 +248,17 @@ class StoryService {
     }
   }
 
-  /// Saves watch/read progress (0.0 - 1.0) for the current user.
-  Future<void> updateProgress(String storyId, double progress) async {
+  /// Saves watch/read progress (0.0 - 1.0) + which episode was last
+  /// opened, for the current user. Returns whether the backend now
+  /// considers this story "completed" (last episode reached AND the
+  /// story's own status is "completed").
+  Future<bool> updateProgress(String storyId, double progress, {int? lastChapterNo}) async {
     try {
-      await _dio.put('/stories/$storyId/progress', data: {'progress': progress});
+      final res = await _dio.put('/stories/$storyId/progress', data: {
+        'progress': progress,
+        if (lastChapterNo != null) 'lastChapterNo': lastChapterNo,
+      });
+      return res.data['completed'] as bool;
     } on DioException catch (e) {
       throw _extractError(e, 'Could not save your progress.');
     }
