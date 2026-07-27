@@ -101,6 +101,16 @@ class DocumentaryService {
     }
   }
 
+  Future<List<DocumentaryModel>> fetchCompleted() async {
+    try {
+      final res = await _dio.get('/documentaries/completed');
+      final list = res.data as List;
+      return list.map((json) => DocumentaryModel.fromJson(json as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load completed documentaries.');
+    }
+  }
+
   Future<List<DocumentaryModel>> fetchWatching() async {
     try {
       final res = await _dio.get('/documentaries/watching');
