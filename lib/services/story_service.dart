@@ -194,6 +194,16 @@ class StoryService {
 
   /// Stories the current user has started but not finished, most
   /// recently watched first -- powers the "Watching" section directly.
+  Future<List<StoryModel>> fetchCompleted() async {
+    try {
+      final res = await _dio.get('/stories/completed');
+      final list = res.data as List;
+      return list.map((json) => StoryModel.fromJson(json as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not load completed stories.');
+    }
+  }
+
   Future<List<StoryModel>> fetchWatching() async {
     try {
       final res = await _dio.get('/stories/watching');
