@@ -19,7 +19,6 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
   final _storyService = StoryService();
 
   late Future<_DetailData> _dataFuture;
-  double? _pendingProgress;
 
   // Episode selector state -- which episode's text is currently shown,
   // and whether the "All Episodes" panel is expanded. The panel stays
