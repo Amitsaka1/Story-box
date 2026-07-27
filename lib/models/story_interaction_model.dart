@@ -6,12 +6,14 @@ class StoryInteractionModel {
   final int? myRating; // 1-5, or null if this user hasn't rated it
   final double progress; // 0.0 - 1.0
   final bool completed;
+  final int lastChapterNo; // which episode to resume into
 
   const StoryInteractionModel({
     required this.isLiked,
     required this.myRating,
     required this.progress,
     required this.completed,
+    required this.lastChapterNo,
   });
 
   factory StoryInteractionModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class StoryInteractionModel {
       myRating: json['myRating'] as int?,
       progress: (json['progress'] as num).toDouble(),
       completed: json['completed'] as bool,
+      lastChapterNo: json['lastChapterNo'] as int? ?? 1,
     );
   }
 
@@ -28,12 +31,14 @@ class StoryInteractionModel {
     int? myRating,
     double? progress,
     bool? completed,
+    int? lastChapterNo,
   }) {
     return StoryInteractionModel(
       isLiked: isLiked ?? this.isLiked,
       myRating: myRating ?? this.myRating,
       progress: progress ?? this.progress,
       completed: completed ?? this.completed,
+      lastChapterNo: lastChapterNo ?? this.lastChapterNo,
     );
   }
 }
