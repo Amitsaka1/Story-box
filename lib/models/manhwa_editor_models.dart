@@ -24,9 +24,11 @@ class EditablePage {
 
 /// One bubble's editable state. `number` is the cumulative, series-wide
 /// bubble number -- assigned by [renumberPages], never typed manually.
-/// Position/size is set ONCE by whichever language is entered first
-/// (the "primary") and shared by every other language added after --
-/// switching/adding language never moves or resizes the box.
+/// Position/size/style is set ONCE (by whichever language is entered
+/// first, the "primary") and shared by every other language added
+/// after -- switching/adding language never moves, resizes, or
+/// restyles the box, it only swaps which string from [translations]
+/// gets rendered inside it.
 class EditableTextBox {
   int number;
   double x;
