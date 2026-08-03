@@ -279,3 +279,169 @@ class _BubbleCounter extends StatelessWidget {
     );
   }
 }
+
+class _BubbleDialogResult {
+  final String? primaryLang;
+  final Map<String, String> translations;
+  _BubbleDialogResult({required this.primaryLang, required this.translations});
+}
+
+/// Edits every language's text for ONE bubble. The first language row
+/// (index 0) is the "primary" -- it owns the drag/resize position on
+/// the page. Every language added after via "+ Add language" shares
+/// that exact same position; only the text content differs, and font
+/// size will auto-shrink per-language at render time (a later step) so
+/// nothing overflows the shared box.
+class _BubbleTextDialog extends StatefulWidget {
+  final EditableTextBox box;
+  const _BubbleTextDialog({required this.box});
+
+  @override
+  State<_BubbleTextDialog> createState() => _BubbleTextDialogState();
+}
+
+class _BubbleTextDialogState extends State<_BubbleTextDialog> {
+  late List<String> _langOrder;
+  late Map<String, TextEditingController> _controllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _langOrder = widget.box.translations.keys.toList();
+    if (widget.box.primaryLang != null && _langOrder.remove(widget.box.primaryLang)) {
+      _langOrder.insert(0, widget.box.primaryLang!);
+    }
+    if (_langOrder.isEmpty) _langOrder.add(_supportedLanguages.keys.first);
+    _controllers = {
+      for (final lang in _langOrder) lang: TextEditingController(text: widget.box.translations[lang]),
+    };
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addLanguageRow() {
+    final available = _supportedLanguages.keys.where((l) => !_langOrder.contains(l)).toList();
+    if (available.isEmpty) return;
+    setState(() {
+      final lang = available.first;
+      _langOrder.add(lang);
+      _controllers[lang] = TextEditingController();
+    });
+  }
+
+  void _removeLanguageRow(String lang) {
+    if (_langOrder.first == lang && _langOrder.length > 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Remove the other languages first before removing the primary one.')),
+      );
+      return;
+    }
+    setState(() {
+      _langOrder.remove(lang);
+      _controllers.remove(lang)?.dispose();
+    });
+  }
+
+  void _changeLanguageAt(int index, String newLang) {
+    setState(() {
+      final oldLang = _langOrder[index];
+      final controller = _controllers.remove(oldLang)!;
+      _langOrder[index] = newLang;
+      _controllers[newLang] = controller;
+    });
+  }
+
+  void _save() {
+    final translations = <String, String>{};
+    for (final lang in _langOrder) {
+      final text = _controllers[lang]!.text.trim();
+      if (text.isNotEmpty) translations[lang] = text;
+    }
+    Navigator.of(context).pop(
+      _BubbleDialogResult(
+        primaryLang: translations.isEmpty ? null : _langOrder.first,
+        translations: translations,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Bubble #${widget.box.number}'),
+      content: SizedBox(
+        width: 360,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < _langOrder.length; i++) _buildLanguageRow(i),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _addLanguageRow,
+                icon: const Icon(Icons.add),
+                label: const Text('Add language'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(onPressed: _save, child: const Text('Save')),
+      ],
+    );
+  }
+
+  Widget _buildLanguageRow(int index) {
+    final lang = _langOrder[index];
+    final isPrimary = index == 0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: lang,
+                  decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                  items: _supportedLanguages.entries
+                      .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                      .toList(),
+                  onChanged: (newLang) {
+                    if (newLang == null || newLang == lang) return;
+                    _changeLanguageAt(index, newLang);
+                  },
+                ),
+              ),
+              if (isPrimary)
+                const Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: Tooltip(
+                    message: "Primary -- owns this bubble's position",
+                    child: Icon(Icons.star, color: Colors.amber),
+                  ),
+                ),
+              if (!isPrimary)
+                IconButton(onPressed: () => _removeLanguageRow(lang), icon: const Icon(Icons.close, size: 18)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _controllers[lang],
+            maxLines: 3,
+            decoration: const InputDecoration(hintText: 'Dialogue text...', border: OutlineInputBorder()),
+          ),
+        ],
+      ),
+    );
+  }
+}
