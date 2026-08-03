@@ -3,6 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/models/manhwa_editor_models.dart';
 
+/// Languages the admin panel currently supports. Extend this map to
+/// add more -- nothing else needs to change.
+const _supportedLanguages = <String, String>{
+  'en': 'English',
+  'hi': 'Hindi',
+  'ko': 'Korean',
+  'ja': 'Japanese',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+};
+
 /// Reader-style vertical scroll editor for building ONE manhwa chapter:
 /// pick page images (zero gap between them, like the actual reader),
 /// set how many bubbles each page has, then drag/resize + type text
@@ -18,11 +30,6 @@ class ManhwaChapterEditorScreen extends StatefulWidget {
 class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
   final _picker = ImagePicker();
   final List<EditablePage> _pages = [];
-
-  // TODO (later sub-step): replace this hardcoded 'base' with a real
-  // language picker. For now every box's first-entered text is treated
-  // as the primary/base language, matching the position-follow rule.
-  static const _editingLang = 'base';
 
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 90);
@@ -53,27 +60,16 @@ class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
   }
 
   Future<void> _editBoxText(EditableTextBox box) async {
-    final controller = TextEditingController(text: box.translations[_editingLang] ?? '');
-    final result = await showDialog<String>(
+    final result = await showDialog<_BubbleDialogResult>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Bubble #${box.number}'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 4,
-          decoration: const InputDecoration(hintText: 'Dialogue text...', border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Save')),
-        ],
-      ),
+      builder: (context) => _BubbleTextDialog(box: box),
     );
     if (result == null) return;
     setState(() {
-      box.primaryLang ??= _editingLang;
-      box.translations[_editingLang] = result;
+      box.primaryLang = result.primaryLang;
+      box.translations
+        ..clear()
+        ..addAll(result.translations);
     });
   }
 
