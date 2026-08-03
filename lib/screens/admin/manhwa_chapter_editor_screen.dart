@@ -5,10 +5,9 @@ import 'package:my_app/models/manhwa_editor_models.dart';
 
 /// Reader-style vertical scroll editor for building ONE manhwa chapter:
 /// pick page images (zero gap between them, like the actual reader),
-/// then set how many bubbles each page has with a "- [n] +" counter.
-/// Numbers themselves are never shown/typed here -- renumberPages()
-/// assigns them cumulatively across the whole chapter in the
-/// background (used later by the text-box + bulk-text steps).
+/// set how many bubbles each page has, then drag/resize + type text
+/// into each bubble marker. Numbers themselves are never shown/typed --
+/// renumberPages() assigns them cumulatively in the background.
 class ManhwaChapterEditorScreen extends StatefulWidget {
   const ManhwaChapterEditorScreen({super.key});
 
@@ -19,6 +18,11 @@ class ManhwaChapterEditorScreen extends StatefulWidget {
 class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
   final _picker = ImagePicker();
   final List<EditablePage> _pages = [];
+
+  // TODO (later sub-step): replace this hardcoded 'base' with a real
+  // language picker. For now every box's first-entered text is treated
+  // as the primary/base language, matching the position-follow rule.
+  static const _editingLang = 'base';
 
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 90);
@@ -48,6 +52,31 @@ class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
     });
   }
 
+  Future<void> _editBoxText(EditableTextBox box) async {
+    final controller = TextEditingController(text: box.translations[_editingLang] ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Bubble #${box.number}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 4,
+          decoration: const InputDecoration(hintText: 'Dialogue text...', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      box.primaryLang ??= _editingLang;
+      box.translations[_editingLang] = result;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -72,27 +101,140 @@ class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
           : ListView.builder(
               padding: EdgeInsets.zero,
               itemCount: _pages.length,
-              itemBuilder: (context, index) {
-                final page = _pages[index];
-                return Stack(
-                  children: [
-                    // Zero gap: full-width image, no margin/padding, no
-                    // rounded corners between consecutive pages so the
-                    // whole chapter reads as one continuous strip.
-                    Image.memory(page.bytes!, width: double.infinity, fit: BoxFit.fitWidth),
-                    Positioned(
-                      right: 12,
-                      bottom: 12,
-                      child: _BubbleCounter(
-                        count: page.bubbleCount,
-                        onDecrement: () => _changeBubbleCount(index, -1),
-                        onIncrement: () => _changeBubbleCount(index, 1),
-                      ),
-                    ),
-                  ],
-                );
-              },
+              itemBuilder: (context, index) => _EditablePageView(
+                page: _pages[index],
+                onCountChanged: (delta) => _changeBubbleCount(index, delta),
+                onBoxMoved: () => setState(() {}),
+                onBoxTapped: _editBoxText,
+              ),
             ),
+    );
+  }
+}
+
+/// One page: the image, its bubble counter overlay, and every text-box
+/// marker (draggable by its body, resizable by its bottom-right handle).
+/// Coordinates are fractions (0.0-1.0) of this page's own rendered
+/// size -- resolution independent, and trivially reproducible on the
+/// reader side regardless of screen width.
+class _EditablePageView extends StatelessWidget {
+  final EditablePage page;
+  final void Function(int delta) onCountChanged;
+  final VoidCallback onBoxMoved;
+  final void Function(EditableTextBox box) onBoxTapped;
+
+  const _EditablePageView({
+    required this.page,
+    required this.onCountChanged,
+    required this.onBoxMoved,
+    required this.onBoxTapped,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Stack(
+          children: [
+            Image.memory(page.bytes!, width: double.infinity, fit: BoxFit.fitWidth),
+            for (final box in page.textBoxes)
+              _DraggableTextBox(
+                box: box,
+                pageWidth: constraints.maxWidth,
+                onChanged: onBoxMoved,
+                onTap: () => onBoxTapped(box),
+              ),
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: _BubbleCounter(
+                count: page.bubbleCount,
+                onDecrement: () => onCountChanged(-1),
+                onIncrement: () => onCountChanged(1),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// A single bubble marker: tap to edit its text, drag its body to move
+/// it, drag its bottom-right handle to resize it. x/y/width/height on
+/// [box] are fractions of [pageWidth] (height uses the same fraction
+/// scale, i.e. a "square" fraction system, which is fine since these
+/// are just editor-time coordinates, not the rendered image height).
+class _DraggableTextBox extends StatelessWidget {
+  final EditableTextBox box;
+  final double pageWidth;
+  final VoidCallback onChanged;
+  final VoidCallback onTap;
+
+  const _DraggableTextBox({
+    required this.box,
+    required this.pageWidth,
+    required this.onChanged,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // First time this box is rendered with no size set yet, give it a
+    // sane default so it's visible and immediately draggable.
+    if (box.width == 0) box.width = 0.35;
+    if (box.height == 0) box.height = 0.08;
+
+    return Positioned(
+      left: box.x * pageWidth,
+      top: box.y * pageWidth,
+      width: box.width * pageWidth,
+      height: box.height * pageWidth,
+      child: GestureDetector(
+        onTap: onTap,
+        onPanUpdate: (details) {
+          box.x += details.delta.dx / pageWidth;
+          box.y += details.delta.dy / pageWidth;
+          onChanged();
+        },
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.orangeAccent, width: 2),
+                color: Colors.orangeAccent.withValues(alpha: 0.15),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                box.translations.values.isNotEmpty ? box.translations.values.first : '#${box.number}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: Colors.black87),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: GestureDetector(
+                onPanUpdate: (details) {
+                  box.width += details.delta.dx / pageWidth;
+                  box.height += details.delta.dy / pageWidth;
+                  if (box.width < 0.05) box.width = 0.05;
+                  if (box.height < 0.03) box.height = 0.03;
+                  onChanged();
+                },
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: const BoxDecoration(color: Colors.orangeAccent, shape: BoxShape.circle),
+                  child: const Icon(Icons.open_in_full, size: 12, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
