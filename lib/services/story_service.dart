@@ -135,6 +135,22 @@ class StoryService {
     }
   }
 
+  /// Uploads ONE manhwa page (clean image, no text) and returns its
+  /// CDN URL. Admin panel calls this once per page as the user adds
+  /// images, then uses the returned URLs when building the `pages`
+  /// array inside each chapter passed to [addStory]/[updateStory].
+  Future<String> uploadPageImage(Uint8List imageBytes, String filename) async {
+    try {
+      final formData = FormData.fromMap({
+        'image': MultipartFile.fromBytes(imageBytes, filename: filename),
+      });
+      final res = await _dio.post('/stories/page-image', data: formData);
+      return res.data['imageUrl'] as String;
+    } on DioException catch (e) {
+      throw _extractError(e, 'Could not upload this page image.');
+    }
+  }
+
   /// Story ka actual text seedha CDN se fetch karta hai -- backend
   /// (_dio, jispe auth token attach hota hai) use nahi karta, kyunki
   /// ye ek alag public CDN domain hai, apna backend nahi.
