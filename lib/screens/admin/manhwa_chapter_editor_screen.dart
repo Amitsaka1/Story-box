@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/models/manhwa_editor_models.dart';
+import 'package:my_app/services/story_service.dart';
 
 /// Languages the admin panel currently supports. Extend this map to
 /// add more -- nothing else needs to change.
@@ -40,7 +41,8 @@ const _textColorSwatches = <int>[
 /// map) -- so once styled/placed for the first language, every other
 /// language pasted later reuses that exact spot and look automatically.
 class ManhwaChapterEditorScreen extends StatefulWidget {
-  const ManhwaChapterEditorScreen({super.key});
+  final int chapterNo;
+  const ManhwaChapterEditorScreen({super.key, required this.chapterNo});
 
   @override
   State<ManhwaChapterEditorScreen> createState() => _ManhwaChapterEditorScreenState();
@@ -48,9 +50,12 @@ class ManhwaChapterEditorScreen extends StatefulWidget {
 
 class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
   final _picker = ImagePicker();
+  final _storyService = StoryService();
   final List<EditablePage> _pages = [];
   final _bulkTextController = TextEditingController();
   String _activeLang = _supportedLanguages.keys.first;
+  bool _publishing = false;
+  String? _publishProgress;
 
   @override
   void dispose() {
