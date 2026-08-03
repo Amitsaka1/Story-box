@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/models/manhwa_editor_models.dart';
@@ -15,11 +14,20 @@ const _supportedLanguages = <String, String>{
   'de': 'German',
 };
 
-/// Reader-style vertical scroll editor for building ONE manhwa chapter:
-/// pick page images (zero gap between them, like the actual reader),
-/// set how many bubbles each page has, then drag/resize + type text
-/// into each bubble marker. Numbers themselves are never shown/typed --
-/// renumberPages() assigns them cumulatively in the background.
+/// Reader-style vertical scroll editor for building ONE manhwa chapter.
+///
+/// Flow: pick page images (zero gap, like the real reader) -> set each
+/// page's bubble count with "- [n] +" (numbers are cumulative across
+/// the whole chapter, assigned in the background) -> pick a language
+/// in the panel up top, paste ALL of that language's dialogue at once
+/// as "1. ...", "2. ...", "3. ..." and hit Apply -> every numbered line
+/// instantly appears as an overlay on its correct page, all at once --
+/// no per-bubble popup, no typing directly on the image. Then just
+/// scroll through and drag/resize each box into place. Position/size
+/// live on the box itself (shared by every language, since a box is
+/// one object holding a translations map) -- so once placed for the
+/// first language, every other language pasted later reuses that exact
+/// spot automatically.
 class ManhwaChapterEditorScreen extends StatefulWidget {
   const ManhwaChapterEditorScreen({super.key});
 
@@ -30,6 +38,14 @@ class ManhwaChapterEditorScreen extends StatefulWidget {
 class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
   final _picker = ImagePicker();
   final List<EditablePage> _pages = [];
+  final _bulkTextController = TextEditingController();
+  String _activeLang = _supportedLanguages.keys.first;
+
+  @override
+  void dispose() {
+    _bulkTextController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 90);
@@ -59,18 +75,66 @@ class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
     });
   }
 
-  Future<void> _editBoxText(EditableTextBox box) async {
-    final result = await showDialog<_BubbleDialogResult>(
-      context: context,
-      builder: (context) => _BubbleTextDialog(box: box),
-    );
-    if (result == null) return;
+  /// Every box across every page, flattened -- since numbering is
+  /// cumulative/global, this is what bulk-apply matches numbers
+  /// against, not any single page's list.
+  List<EditableTextBox> get _allBoxes => _pages.expand((p) => p.textBoxes).toList();
+
+  /// Parses "1. text\n2. text\n3. text..." (each entry can also span
+  /// multiple lines -- anything before the next "N." marker is
+  /// appended to the current entry) into {number: text}.
+  Map<int, String> _parseBulkText(String raw) {
+    final result = <int, String>{};
+    int? currentNumber;
+    final buffer = StringBuffer();
+
+    void flush() {
+      if (currentNumber != null) {
+        result[currentNumber!] = buffer.toString().trim();
+      }
+      buffer.clear();
+    }
+
+    final lineMatcher = RegExp(r'^\s*(\d+)\.\s*(.*)$');
+    for (final line in raw.split('\n')) {
+      final match = lineMatcher.firstMatch(line);
+      if (match != null) {
+        flush();
+        currentNumber = int.parse(match.group(1)!);
+        buffer.write(match.group(2) ?? '');
+      } else if (currentNumber != null) {
+        if (buffer.isNotEmpty) buffer.write(' ');
+        buffer.write(line.trim());
+      }
+    }
+    flush();
+    return result;
+  }
+
+  void _applyBulkText() {
+    final parsed = _parseBulkText(_bulkTextController.text);
+    if (parsed.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No numbered lines found -- format each line as "1. dialogue text".')),
+      );
+      return;
+    }
+
+    final boxesByNumber = {for (final box in _allBoxes) box.number: box};
+    var appliedCount = 0;
     setState(() {
-      box.primaryLang = result.primaryLang;
-      box.translations
-        ..clear()
-        ..addAll(result.translations);
+      parsed.forEach((number, text) {
+        final box = boxesByNumber[number];
+        if (box == null || text.isEmpty) return;
+        box.translations[_activeLang] = text;
+        box.primaryLang ??= _activeLang; // first language ever filled owns the position
+        appliedCount++;
+      });
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Applied text to $appliedCount bubble(s) for ${_supportedLanguages[_activeLang]}.')),
+    );
   }
 
   @override
@@ -86,44 +150,135 @@ class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
           ),
         ],
       ),
-      body: _pages.isEmpty
-          ? Center(
-              child: OutlinedButton.icon(
-                onPressed: _pickImages,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: const Text('Upload page images'),
-              ),
-            )
-          : ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: _pages.length,
-              itemBuilder: (context, index) => _EditablePageView(
-                page: _pages[index],
-                onCountChanged: (delta) => _changeBubbleCount(index, delta),
-                onBoxMoved: () => setState(() {}),
-                onBoxTapped: _editBoxText,
-              ),
+      body: Column(
+        children: [
+          _BulkTextPanel(
+            activeLang: _activeLang,
+            controller: _bulkTextController,
+            onLangChanged: (lang) => setState(() => _activeLang = lang),
+            onApply: _applyBulkText,
+          ),
+          Expanded(
+            child: _pages.isEmpty
+                ? Center(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickImages,
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      label: const Text('Upload page images'),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _pages.length,
+                    itemBuilder: (context, index) => _EditablePageView(
+                      page: _pages[index],
+                      previewLang: _activeLang,
+                      onCountChanged: (delta) => _changeBubbleCount(index, delta),
+                      onBoxMoved: () => setState(() {}),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Fixed panel at the top: pick which language you're currently
+/// pasting, paste all numbered lines for it, hit Apply. Collapsible so
+/// it doesn't eat scroll space while you're busy dragging boxes.
+class _BulkTextPanel extends StatefulWidget {
+  final String activeLang;
+  final TextEditingController controller;
+  final void Function(String lang) onLangChanged;
+  final VoidCallback onApply;
+
+  const _BulkTextPanel({
+    required this.activeLang,
+    required this.controller,
+    required this.onLangChanged,
+    required this.onApply,
+  });
+
+  @override
+  State<_BulkTextPanel> createState() => _BulkTextPanelState();
+}
+
+class _BulkTextPanelState extends State<_BulkTextPanel> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: widget.activeLang,
+                    decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                    items: _supportedLanguages.entries
+                        .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                        .toList(),
+                    onChanged: (lang) {
+                      if (lang != null) widget.onLangChanged(lang);
+                    },
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                  tooltip: _expanded ? 'Collapse' : 'Expand',
+                ),
+              ],
             ),
+            if (_expanded) ...[
+              const SizedBox(height: 8),
+              TextField(
+                controller: widget.controller,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  hintText: '1. Kya tum sach me aaogi?\n2. Haan zaroor.\n3. Toh theek hai.',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: widget.onApply,
+                  icon: const Icon(Icons.check),
+                  label: const Text('Apply to bubbles'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
 
 /// One page: the image, its bubble counter overlay, and every text-box
-/// marker (draggable by its body, resizable by its bottom-right handle).
-/// Coordinates are fractions (0.0-1.0) of this page's own rendered
-/// size -- resolution independent, and trivially reproducible on the
-/// reader side regardless of screen width.
+/// marker (draggable by its body, resizable by its bottom-right
+/// handle). No tap-to-edit anymore -- text comes from the bulk panel;
+/// this view is purely for positioning/sizing what was just pasted.
 class _EditablePageView extends StatelessWidget {
   final EditablePage page;
+  final String previewLang;
   final void Function(int delta) onCountChanged;
   final VoidCallback onBoxMoved;
-  final void Function(EditableTextBox box) onBoxTapped;
 
   const _EditablePageView({
     required this.page,
+    required this.previewLang,
     required this.onCountChanged,
     required this.onBoxMoved,
-    required this.onBoxTapped,
   });
 
   @override
@@ -136,9 +291,9 @@ class _EditablePageView extends StatelessWidget {
             for (final box in page.textBoxes)
               _DraggableTextBox(
                 box: box,
+                previewLang: previewLang,
                 pageWidth: constraints.maxWidth,
                 onChanged: onBoxMoved,
-                onTap: () => onBoxTapped(box),
               ),
             Positioned(
               right: 12,
@@ -156,22 +311,23 @@ class _EditablePageView extends StatelessWidget {
   }
 }
 
-/// A single bubble marker: tap to edit its text, drag its body to move
-/// it, drag its bottom-right handle to resize it. x/y/width/height on
-/// [box] are fractions of [pageWidth] (height uses the same fraction
-/// scale, i.e. a "square" fraction system, which is fine since these
-/// are just editor-time coordinates, not the rendered image height).
+/// A single bubble marker: drag its body to move it, drag its
+/// bottom-right handle to resize it. Shows whatever text exists for
+/// [previewLang] (falling back to any available language) so you can
+/// see what you're positioning. x/y/width/height are fractions of
+/// [pageWidth] -- resolution independent, shared across every
+/// language automatically since they live on the same box object.
 class _DraggableTextBox extends StatelessWidget {
   final EditableTextBox box;
+  final String previewLang;
   final double pageWidth;
   final VoidCallback onChanged;
-  final VoidCallback onTap;
 
   const _DraggableTextBox({
     required this.box,
+    required this.previewLang,
     required this.pageWidth,
     required this.onChanged,
-    required this.onTap,
   });
 
   @override
@@ -181,28 +337,35 @@ class _DraggableTextBox extends StatelessWidget {
     if (box.width == 0) box.width = 0.35;
     if (box.height == 0) box.height = 0.08;
 
+    final previewText = box.translations[previewLang] ??
+        (box.translations.isNotEmpty ? box.translations.values.first : '#${box.number}');
+
     return Positioned(
       left: box.x * pageWidth,
       top: box.y * pageWidth,
       width: box.width * pageWidth,
       height: box.height * pageWidth,
       child: GestureDetector(
-        onTap: onTap,
         onPanUpdate: (details) {
           box.x += details.delta.dx / pageWidth;
           box.y += details.delta.dy / pageWidth;
           onChanged();
         },
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             Container(
+              // Dashed-look editor guide only -- this border never
+              // renders on the actual reader/published page, it just
+              // shows the admin where the text will sit.
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.orangeAccent, width: 2),
-                color: Colors.orangeAccent.withValues(alpha: 0.15),
+                border: Border.all(color: Colors.orangeAccent, width: 1.5),
+                color: Colors.orangeAccent.withValues(alpha: 0.12),
               ),
               alignment: Alignment.center,
+              padding: const EdgeInsets.all(2),
               child: Text(
-                box.translations.values.isNotEmpty ? box.translations.values.first : '#${box.number}',
+                previewText,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12, color: Colors.black87),
                 maxLines: 3,
@@ -273,172 +436,6 @@ class _BubbleCounter extends StatelessWidget {
             icon: const Icon(Icons.add, color: Colors.white, size: 18),
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             padding: EdgeInsets.zero,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BubbleDialogResult {
-  final String? primaryLang;
-  final Map<String, String> translations;
-  _BubbleDialogResult({required this.primaryLang, required this.translations});
-}
-
-/// Edits every language's text for ONE bubble. The first language row
-/// (index 0) is the "primary" -- it owns the drag/resize position on
-/// the page. Every language added after via "+ Add language" shares
-/// that exact same position; only the text content differs, and font
-/// size will auto-shrink per-language at render time (a later step) so
-/// nothing overflows the shared box.
-class _BubbleTextDialog extends StatefulWidget {
-  final EditableTextBox box;
-  const _BubbleTextDialog({required this.box});
-
-  @override
-  State<_BubbleTextDialog> createState() => _BubbleTextDialogState();
-}
-
-class _BubbleTextDialogState extends State<_BubbleTextDialog> {
-  late List<String> _langOrder;
-  late Map<String, TextEditingController> _controllers;
-
-  @override
-  void initState() {
-    super.initState();
-    _langOrder = widget.box.translations.keys.toList();
-    if (widget.box.primaryLang != null && _langOrder.remove(widget.box.primaryLang)) {
-      _langOrder.insert(0, widget.box.primaryLang!);
-    }
-    if (_langOrder.isEmpty) _langOrder.add(_supportedLanguages.keys.first);
-    _controllers = {
-      for (final lang in _langOrder) lang: TextEditingController(text: widget.box.translations[lang]),
-    };
-  }
-
-  @override
-  void dispose() {
-    for (final c in _controllers.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  void _addLanguageRow() {
-    final available = _supportedLanguages.keys.where((l) => !_langOrder.contains(l)).toList();
-    if (available.isEmpty) return;
-    setState(() {
-      final lang = available.first;
-      _langOrder.add(lang);
-      _controllers[lang] = TextEditingController();
-    });
-  }
-
-  void _removeLanguageRow(String lang) {
-    if (_langOrder.first == lang && _langOrder.length > 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Remove the other languages first before removing the primary one.')),
-      );
-      return;
-    }
-    setState(() {
-      _langOrder.remove(lang);
-      _controllers.remove(lang)?.dispose();
-    });
-  }
-
-  void _changeLanguageAt(int index, String newLang) {
-    setState(() {
-      final oldLang = _langOrder[index];
-      final controller = _controllers.remove(oldLang)!;
-      _langOrder[index] = newLang;
-      _controllers[newLang] = controller;
-    });
-  }
-
-  void _save() {
-    final translations = <String, String>{};
-    for (final lang in _langOrder) {
-      final text = _controllers[lang]!.text.trim();
-      if (text.isNotEmpty) translations[lang] = text;
-    }
-    Navigator.of(context).pop(
-      _BubbleDialogResult(
-        primaryLang: translations.isEmpty ? null : _langOrder.first,
-        translations: translations,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Bubble #${widget.box.number}'),
-      content: SizedBox(
-        width: 360,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < _langOrder.length; i++) _buildLanguageRow(i),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _addLanguageRow,
-                icon: const Icon(Icons.add),
-                label: const Text('Add language'),
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        FilledButton(onPressed: _save, child: const Text('Save')),
-      ],
-    );
-  }
-
-  Widget _buildLanguageRow(int index) {
-    final lang = _langOrder[index];
-    final isPrimary = index == 0;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: lang,
-                  decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-                  items: _supportedLanguages.entries
-                      .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-                      .toList(),
-                  onChanged: (newLang) {
-                    if (newLang == null || newLang == lang) return;
-                    _changeLanguageAt(index, newLang);
-                  },
-                ),
-              ),
-              if (isPrimary)
-                const Padding(
-                  padding: EdgeInsets.only(left: 8),
-                  child: Tooltip(
-                    message: "Primary -- owns this bubble's position",
-                    child: Icon(Icons.star, color: Colors.amber),
-                  ),
-                ),
-              if (!isPrimary)
-                IconButton(onPressed: () => _removeLanguageRow(lang), icon: const Icon(Icons.close, size: 18)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _controllers[lang],
-            maxLines: 3,
-            decoration: const InputDecoration(hintText: 'Dialogue text...', border: OutlineInputBorder()),
           ),
         ],
       ),
