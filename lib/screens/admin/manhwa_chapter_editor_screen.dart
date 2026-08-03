@@ -14,6 +14,16 @@ const _supportedLanguages = <String, String>{
   'de': 'German',
 };
 
+/// Text colors offered in the inline swatch row. Kept small and fixed
+/// -- a full color-wheel picker is unnecessary for dialogue text.
+const _textColorSwatches = <int>[
+  0xFF000000, // black
+  0xFFFFFFFF, // white
+  0xFFD32F2F, // red (shouting/anger)
+  0xFF1976D2, // blue (thought/calm)
+  0xFF388E3C, // green
+];
+
 /// Reader-style vertical scroll editor for building ONE manhwa chapter.
 ///
 /// Flow: pick page images (zero gap, like the real reader) -> set each
@@ -23,11 +33,12 @@ const _supportedLanguages = <String, String>{
 /// as "1. ...", "2. ...", "3. ..." and hit Apply -> every numbered line
 /// instantly appears as an overlay on its correct page, all at once --
 /// no per-bubble popup, no typing directly on the image. Then just
-/// scroll through and drag/resize each box into place. Position/size
-/// live on the box itself (shared by every language, since a box is
-/// one object holding a translations map) -- so once placed for the
-/// first language, every other language pasted later reuses that exact
-/// spot automatically.
+/// scroll through and drag/resize each box into place, and adjust its
+/// font-size/color with the small inline toolbar above it. Position,
+/// size, font-size and color all live on the box itself (shared by
+/// every language, since a box is one object holding a translations
+/// map) -- so once styled/placed for the first language, every other
+/// language pasted later reuses that exact spot and look automatically.
 class ManhwaChapterEditorScreen extends StatefulWidget {
   const ManhwaChapterEditorScreen({super.key});
 
@@ -266,8 +277,9 @@ class _BulkTextPanelState extends State<_BulkTextPanel> {
 
 /// One page: the image, its bubble counter overlay, and every text-box
 /// marker (draggable by its body, resizable by its bottom-right
-/// handle). No tap-to-edit anymore -- text comes from the bulk panel;
-/// this view is purely for positioning/sizing what was just pasted.
+/// handle, styleable via its inline toolbar). No tap-to-edit anymore --
+/// text comes from the bulk panel; this view is purely for
+/// positioning/sizing/styling what was just pasted.
 class _EditablePageView extends StatelessWidget {
   final EditablePage page;
   final String previewLang;
@@ -294,6 +306,7 @@ class _EditablePageView extends StatelessWidget {
                 previewLang: previewLang,
                 pageWidth: constraints.maxWidth,
                 onChanged: onBoxMoved,
+                onStyleChanged: onBoxMoved,
               ),
             Positioned(
               right: 12,
@@ -312,23 +325,31 @@ class _EditablePageView extends StatelessWidget {
 }
 
 /// A single bubble marker: drag its body to move it, drag its
-/// bottom-right handle to resize it. Shows whatever text exists for
-/// [previewLang] (falling back to any available language) so you can
-/// see what you're positioning. x/y/width/height are fractions of
-/// [pageWidth] -- resolution independent, shared across every
-/// language automatically since they live on the same box object.
+/// bottom-right handle to resize it, use the small toolbar above it to
+/// change font-size/color. Shows whatever text exists for [previewLang]
+/// (falling back to any available language) so you can see what you're
+/// positioning. x/y/width/height are fractions of [pageWidth] --
+/// resolution independent, shared across every language automatically
+/// since they live on the same box object.
 class _DraggableTextBox extends StatelessWidget {
   final EditableTextBox box;
   final String previewLang;
   final double pageWidth;
   final VoidCallback onChanged;
+  final VoidCallback onStyleChanged;
 
   const _DraggableTextBox({
     required this.box,
     required this.previewLang,
     required this.pageWidth,
     required this.onChanged,
+    required this.onStyleChanged,
   });
+
+  void _changeFontSize(double delta) {
+    box.fontSize = (box.fontSize + delta).clamp(8, 48);
+    onStyleChanged();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -367,9 +388,42 @@ class _DraggableTextBox extends StatelessWidget {
               child: Text(
                 previewText,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: Colors.black87),
+                style: TextStyle(fontSize: box.fontSize, color: Color(box.colorValue)),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // Inline style toolbar -- floats just above the box so it
+            // never blocks the drag/resize gesture areas below it.
+            Positioned(
+              top: -30,
+              left: 0,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _MiniIconButton(icon: Icons.remove, onTap: () => _changeFontSize(-1), tooltip: 'Smaller text'),
+                  SizedBox(
+                    width: 28,
+                    child: Text(
+                      box.fontSize.toStringAsFixed(0),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
+                  _MiniIconButton(icon: Icons.add, onTap: () => _changeFontSize(1), tooltip: 'Bigger text'),
+                  const SizedBox(width: 6),
+                  for (final swatch in _textColorSwatches) ...[
+                    _ColorSwatchDot(
+                      color: swatch,
+                      selected: box.colorValue == swatch,
+                      onTap: () {
+                        box.colorValue = swatch;
+                        onStyleChanged();
+                      },
+                    ),
+                    const SizedBox(width: 3),
+                  ],
+                ],
               ),
             ),
             Positioned(
@@ -392,6 +446,59 @@ class _DraggableTextBox extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Small floating circular icon button used in the inline style
+/// toolbar above each bubble.
+class _MiniIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _MiniIconButton({required this.icon, required this.onTap, required this.tooltip});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.7), shape: BoxShape.circle),
+          child: Icon(icon, size: 13, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+/// One tappable color dot in the inline swatch row.
+class _ColorSwatchDot extends StatelessWidget {
+  final int color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ColorSwatchDot({required this.color, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          color: Color(color),
+          shape: BoxShape.circle,
+          border: Border.all(color: selected ? Colors.orangeAccent : Colors.white54, width: selected ? 2 : 1),
         ),
       ),
     );
