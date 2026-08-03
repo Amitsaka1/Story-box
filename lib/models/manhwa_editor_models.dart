@@ -33,6 +33,8 @@ class EditableTextBox {
   double y;
   double width;
   double height;
+  double fontSize; // starting point for auto-shrink-per-language at render time
+  int colorValue; // ARGB int, e.g. 0xFF000000 for black
   String? primaryLang; // which language "owns" this box's position
   Map<String, String> translations;
 
@@ -40,8 +42,10 @@ class EditableTextBox {
     required this.number,
     this.x = 0,
     this.y = 0,
-    this.width = 120,
-    this.height = 60,
+    this.width = 0,
+    this.height = 0,
+    this.fontSize = 14,
+    this.colorValue = 0xFF000000,
     this.primaryLang,
     Map<String, String>? translations,
   }) : translations = translations ?? {};
