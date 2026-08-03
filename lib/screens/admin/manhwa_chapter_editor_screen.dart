@@ -153,6 +153,81 @@ class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
     );
   }
 
+  /// Uploads every not-yet-uploaded page image, then converts all
+  /// editor state into the final `{ chapterNo, pages: [...] }` shape
+  /// that the backend's validateManhwaChapters() expects, and returns
+  /// it to whoever pushed this screen (add_content_screen bundles it
+  /// with the other chapters and calls addStory/updateStory).
+  Future<void> _publishChapter() async {
+    if (_pages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add at least one page before publishing.')),
+      );
+      return;
+    }
+
+    final emptyBoxes = _allBoxes.where((b) => b.translations.isEmpty).toList();
+    if (emptyBoxes.isNotEmpty) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Some bubbles have no text'),
+          content: Text(
+            '${emptyBoxes.length} bubble(s) (e.g. #${emptyBoxes.first.number}) have no text in any '
+            'language yet. Publish anyway?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Go back')),
+            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Publish anyway')),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
+    setState(() => _publishing = true);
+    try {
+      for (var i = 0; i < _pages.length; i++) {
+        final page = _pages[i];
+        if (page.uploadedImageUrl != null) continue;
+        setState(() => _publishProgress = 'Uploading page ${i + 1} of ${_pages.length}...');
+        page.uploadedImageUrl = await _storyService.uploadPageImage(page.bytes!, page.filename ?? 'page_$i.jpg');
+      }
+
+      final chapterData = {
+        'chapterNo': widget.chapterNo,
+        'pages': [
+          for (var i = 0; i < _pages.length; i++)
+            {
+              'pageNo': i + 1,
+              'imageUrl': _pages[i].uploadedImageUrl,
+              'textBoxes': [
+                for (final box in _pages[i].textBoxes)
+                  {
+                    'number': box.number,
+                    'x': box.x,
+                    'y': box.y,
+                    'width': box.width,
+                    'height': box.height,
+                    'fontSize': box.fontSize,
+                    'colorValue': box.colorValue,
+                    'translations': box.translations,
+                  },
+              ],
+            },
+        ],
+      };
+
+      if (!mounted) return;
+      Navigator.of(context).pop(chapterData);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -193,6 +268,19 @@ class _ManhwaChapterEditorScreenState extends State<ManhwaChapterEditorScreen> {
                       onBoxMoved: () => setState(() {}),
                     ),
                   ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: FilledButton.icon(
+                onPressed: _publishing ? null : _publishChapter,
+                icon: _publishing
+                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.cloud_upload_outlined),
+                label: Text(_publishing ? (_publishProgress ?? 'Publishing...') : 'Publish Chapter ${widget.chapterNo}'),
+              ),
+            ),
           ),
         ],
       ),
