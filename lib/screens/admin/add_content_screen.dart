@@ -2,15 +2,18 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/models/category_model.dart';
+import 'package:my_app/screens/admin/manhwa_chapter_upload_screen.dart';
 import 'package:my_app/services/documentary_service.dart';
 import 'package:my_app/services/story_service.dart';
 
-enum _ContentType { story, documentary }
+enum _ContentType { manhwa, documentary }
 
-/// Admin-only screen to add new content. Story and Documentary now use
-/// the EXACT same flow: category select + title + cover image (file) +
-/// chapters + ongoing/completed status. Only which service gets called
-/// (and which category list is used) differs.
+/// Admin-only screen to add new content. Manhwa and Documentary use the
+/// EXACT same flow: category select + title + cover image (file) +
+/// episodes (each episode = one set of fully-ready page images,
+/// uploaded via ManhwaChapterUploadScreen) + ongoing/completed status.
+/// Only which service gets called (and which category list is used)
+/// differs.
 class AddContentScreen extends StatefulWidget {
   const AddContentScreen({super.key});
 
@@ -29,9 +32,11 @@ class _AddContentScreenState extends State<AddContentScreen> {
   Uint8List? _coverBytes;
   String? _coverFilename;
 
-  final List<TextEditingController> _chapterControllers = [TextEditingController()];
+  // Each entry is exactly the {chapterNo, pages: [{pageNo, imageUrl}]}
+  // shape returned by ManhwaChapterUploadScreen -- ready to send as-is.
+  final List<Map<String, dynamic>> _episodes = [];
 
-  _ContentType _type = _ContentType.story;
+  _ContentType _type = _ContentType.manhwa;
   late Future<List<CategoryModel>> _categoriesFuture;
   CategoryModel? _selectedCategory;
   String _status = 'ongoing';
@@ -46,14 +51,11 @@ class _AddContentScreenState extends State<AddContentScreen> {
   @override
   void dispose() {
     _titleController.dispose();
-    for (final c in _chapterControllers) {
-      c.dispose();
-    }
     super.dispose();
   }
 
   Future<List<CategoryModel>> _fetchCategoriesForType() {
-    return _type == _ContentType.story
+    return _type == _ContentType.manhwa
         ? _storyService.fetchCategories()
         : _documentaryService.fetchDocumentaryCategories();
   }
@@ -68,15 +70,33 @@ class _AddContentScreenState extends State<AddContentScreen> {
     });
   }
 
-  void _addChapterField() {
-    setState(() => _chapterControllers.add(TextEditingController()));
+  Future<void> _addEpisode() async {
+    final nextChapterNo = _episodes.length + 1;
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (context) => ManhwaChapterUploadScreen(chapterNo: nextChapterNo)),
+    );
+    if (result == null) return;
+    setState(() => _episodes.add(result));
   }
 
-  void _removeChapterField(int index) {
-    if (_chapterControllers.length == 1) return;
+  Future<void> _editEpisode(int index) async {
+    final chapterNo = _episodes[index]['chapterNo'] as int;
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (context) => ManhwaChapterUploadScreen(chapterNo: chapterNo)),
+    );
+    if (result == null) return;
+    setState(() => _episodes[index] = result);
+  }
+
+  void _removeEpisode(int index) {
     setState(() {
-      _chapterControllers[index].dispose();
-      _chapterControllers.removeAt(index);
+      _episodes.removeAt(index);
+      // Keep chapterNo sequential after a removal -- pages already
+      // uploaded to R2 don't need re-uploading, only the number label
+      // shifts down.
+      for (var i = 0; i < _episodes.length; i++) {
+        _episodes[i]['chapterNo'] = i + 1;
+      }
     });
   }
 
@@ -114,7 +134,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
     if (name == null || name.isEmpty) return;
 
     try {
-      final category = _type == _ContentType.story
+      final category = _type == _ContentType.manhwa
           ? await _storyService.addCategory(name: name)
           : await _documentaryService.addDocumentaryCategory(name: name);
       await _refreshCategories(autoSelect: category);
@@ -137,24 +157,18 @@ class _AddContentScreenState extends State<AddContentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please pick a cover image.')));
       return;
     }
-    final hasEmptyChapter = _chapterControllers.any((c) => c.text.trim().isEmpty);
-    if (hasEmptyChapter) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Every chapter needs some text.')));
+    if (_episodes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add at least one episode.')));
       return;
     }
 
     setState(() => _submitting = true);
     try {
-      final chapters = List.generate(
-        _chapterControllers.length,
-        (i) => {'chapterNo': i + 1, 'text': _chapterControllers[i].text.trim()},
-      );
-
-      if (_type == _ContentType.story) {
+      if (_type == _ContentType.manhwa) {
         await _storyService.addStory(
           title: _titleController.text.trim(),
           categoryId: _selectedCategory!.id,
-          chapters: chapters,
+          chapters: _episodes,
           coverBytes: _coverBytes!,
           coverFilename: _coverFilename!,
           status: _status,
@@ -163,7 +177,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
         await _documentaryService.addDocumentary(
           title: _titleController.text.trim(),
           categoryId: _selectedCategory!.id,
-          chapters: chapters,
+          chapters: _episodes,
           coverBytes: _coverBytes!,
           coverFilename: _coverFilename!,
           status: _status,
@@ -172,18 +186,13 @@ class _AddContentScreenState extends State<AddContentScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_type == _ContentType.story ? 'Story added.' : 'Documentary added.')),
+        SnackBar(content: Text(_type == _ContentType.manhwa ? 'Manhwa added.' : 'Documentary added.')),
       );
       _titleController.clear();
       setState(() {
         _coverBytes = null;
         _coverFilename = null;
-        for (final c in _chapterControllers) {
-          c.dispose();
-        }
-        _chapterControllers
-          ..clear()
-          ..add(TextEditingController());
+        _episodes.clear();
         _selectedCategory = null;
         _status = 'ongoing';
       });
@@ -206,7 +215,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
           children: [
             SegmentedButton<_ContentType>(
               segments: const [
-                ButtonSegment(value: _ContentType.story, label: Text('Story'), icon: Icon(Icons.menu_book_outlined)),
+                ButtonSegment(value: _ContentType.manhwa, label: Text('Manhwa'), icon: Icon(Icons.menu_book_outlined)),
                 ButtonSegment(
                   value: _ContentType.documentary,
                   label: Text('Documentary'),
@@ -294,42 +303,39 @@ class _AddContentScreenState extends State<AddContentScreen> {
             ),
             const SizedBox(height: 24),
 
-            Text('Chapters', style: Theme.of(context).textTheme.labelLarge),
+            Text('Episodes', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
-            ...List.generate(_chapterControllers.length, (i) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text('Chapter ${i + 1}', style: Theme.of(context).textTheme.bodyMedium),
-                        const Spacer(),
-                        if (_chapterControllers.length > 1)
-                          IconButton(
-                            onPressed: () => _removeChapterField(i),
-                            icon: const Icon(Icons.close, size: 18),
-                            tooltip: 'Remove chapter',
-                          ),
-                      ],
-                    ),
-                    TextFormField(
-                      controller: _chapterControllers[i],
-                      maxLines: 6,
-                      decoration: const InputDecoration(
-                        hintText: 'Chapter ka text yahan likho...',
-                        border: OutlineInputBorder(),
+            ...List.generate(_episodes.length, (i) {
+              final episode = _episodes[i];
+              final pageCount = (episode['pages'] as List).length;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: CircleAvatar(child: Text('${episode['chapterNo']}')),
+                  title: Text('Episode ${episode['chapterNo']}'),
+                  subtitle: Text('$pageCount page(s)'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: () => _editEpisode(i),
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'Re-upload / edit pages',
                       ),
-                    ),
-                  ],
+                      IconButton(
+                        onPressed: () => _removeEpisode(i),
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Remove episode',
+                      ),
+                    ],
+                  ),
                 ),
               );
             }),
             OutlinedButton.icon(
-              onPressed: _addChapterField,
+              onPressed: _addEpisode,
               icon: const Icon(Icons.add),
-              label: const Text('Add chapter'),
+              label: const Text('Add episode'),
             ),
 
             const SizedBox(height: 28),
@@ -337,7 +343,7 @@ class _AddContentScreenState extends State<AddContentScreen> {
               onPressed: _submitting ? null : _submit,
               child: _submitting
                   ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(_type == _ContentType.story ? 'Add Story' : 'Add Documentary'),
+                  : Text(_type == _ContentType.manhwa ? 'Add Manhwa' : 'Add Documentary'),
             ),
           ],
         ),
