@@ -2,13 +2,15 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/models/category_model.dart';
+import 'package:my_app/screens/admin/manhwa_chapter_upload_screen.dart';
 import 'package:my_app/services/documentary_service.dart';
 import 'package:my_app/services/story_service.dart';
 
-enum _ContentType { story, documentary }
+enum _ContentType { manhwa, documentary }
 
-/// Admin-only: edit an existing Story or Documentary -- title,
-/// category, status, add/remove episodes, replace the cover image.
+/// Admin-only: edit an existing Manhwa or Documentary -- title,
+/// category, status, add/remove/re-upload episodes, replace the cover
+/// image.
 class EditContentScreen extends StatefulWidget {
   final bool isStory;
   final String id;
@@ -24,7 +26,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
   final _documentaryService = DocumentaryService();
   final _picker = ImagePicker();
 
-  late final _ContentType _type = widget.isStory ? _ContentType.story : _ContentType.documentary;
+  late final _ContentType _type = widget.isStory ? _ContentType.manhwa : _ContentType.documentary;
 
   late Future<void> _loadFuture;
 
@@ -37,7 +39,9 @@ class _EditContentScreenState extends State<EditContentScreen> {
   CategoryModel? _selectedCategory;
   String _status = 'ongoing';
 
-  final List<TextEditingController> _chapterControllers = [];
+  // Each entry is exactly the {chapterNo, pages: [{pageNo, imageUrl}]}
+  // shape returned by ManhwaChapterUploadScreen -- ready to send as-is.
+  final List<Map<String, dynamic>> _episodes = [];
 
   bool _saving = false;
 
@@ -50,14 +54,11 @@ class _EditContentScreenState extends State<EditContentScreen> {
   @override
   void dispose() {
     _titleController.dispose();
-    for (final c in _chapterControllers) {
-      c.dispose();
-    }
     super.dispose();
   }
 
   Future<void> _load() async {
-    final categories = _type == _ContentType.story
+    final categories = _type == _ContentType.manhwa
         ? await _storyService.fetchCategories()
         : await _documentaryService.fetchDocumentaryCategories();
 
@@ -67,7 +68,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
     String coverImageUrl;
     String contentUrl;
 
-    if (_type == _ContentType.story) {
+    if (_type == _ContentType.manhwa) {
       final story = await _storyService.fetchStoryById(widget.id);
       title = story.title;
       categoryId = story.categoryId;
@@ -84,7 +85,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
     }
 
     final content = contentUrl.isNotEmpty
-        ? (_type == _ContentType.story
+        ? (_type == _ContentType.manhwa
             ? await _storyService.fetchStoryContent(contentUrl)
             : await _documentaryService.fetchDocumentaryContent(contentUrl))
         : null;
@@ -98,14 +99,15 @@ class _EditContentScreenState extends State<EditContentScreen> {
           : null;
       _status = status;
       _currentCoverImageUrl = coverImageUrl;
-      _chapterControllers.clear();
+      _episodes.clear();
       if (content != null && content.chapters.isNotEmpty) {
         final sorted = [...content.chapters]..sort((a, b) => a.chapterNo.compareTo(b.chapterNo));
         for (final c in sorted) {
-          _chapterControllers.add(TextEditingController(text: c.text));
+          _episodes.add({
+            'chapterNo': c.chapterNo,
+            'pages': [for (final p in c.pages) {'pageNo': p.pageNo, 'imageUrl': p.imageUrl}],
+          });
         }
-      } else {
-        _chapterControllers.add(TextEditingController());
       }
     });
   }
@@ -120,15 +122,30 @@ class _EditContentScreenState extends State<EditContentScreen> {
     });
   }
 
-  void _addChapterField() {
-    setState(() => _chapterControllers.add(TextEditingController()));
+  Future<void> _addEpisode() async {
+    final nextChapterNo = _episodes.length + 1;
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (context) => ManhwaChapterUploadScreen(chapterNo: nextChapterNo)),
+    );
+    if (result == null) return;
+    setState(() => _episodes.add(result));
   }
 
-  void _removeChapterField(int index) {
-    if (_chapterControllers.length == 1) return;
+  Future<void> _editEpisode(int index) async {
+    final chapterNo = _episodes[index]['chapterNo'] as int;
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (context) => ManhwaChapterUploadScreen(chapterNo: chapterNo)),
+    );
+    if (result == null) return;
+    setState(() => _episodes[index] = result);
+  }
+
+  void _removeEpisode(int index) {
     setState(() {
-      _chapterControllers[index].dispose();
-      _chapterControllers.removeAt(index);
+      _episodes.removeAt(index);
+      for (var i = 0; i < _episodes.length; i++) {
+        _episodes[i]['chapterNo'] = i + 1;
+      }
     });
   }
 
@@ -137,26 +154,20 @@ class _EditContentScreenState extends State<EditContentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a category.')));
       return;
     }
-    final hasEmptyChapter = _chapterControllers.any((c) => c.text.trim().isEmpty);
-    if (hasEmptyChapter) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Every chapter needs some text.')));
+    if (_episodes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add at least one episode.')));
       return;
     }
 
     setState(() => _saving = true);
     try {
-      final chapters = List.generate(
-        _chapterControllers.length,
-        (i) => {'chapterNo': i + 1, 'text': _chapterControllers[i].text.trim()},
-      );
-
-      if (_type == _ContentType.story) {
+      if (_type == _ContentType.manhwa) {
         await _storyService.updateStory(
           widget.id,
           title: _titleController.text.trim(),
           categoryId: _selectedCategory!.id,
           status: _status,
-          chapters: chapters,
+          chapters: _episodes,
         );
         if (_newCoverBytes != null) {
           await _storyService.replaceCover(widget.id, _newCoverBytes!, _newCoverFilename!);
@@ -167,7 +178,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
           title: _titleController.text.trim(),
           categoryId: _selectedCategory!.id,
           status: _status,
-          chapters: chapters,
+          chapters: _episodes,
         );
         if (_newCoverBytes != null) {
           await _documentaryService.replaceCover(widget.id, _newCoverBytes!, _newCoverFilename!);
@@ -186,7 +197,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Edit ${_type == _ContentType.story ? 'Story' : 'Documentary'}')),
+      appBar: AppBar(title: Text('Edit ${_type == _ContentType.manhwa ? 'Manhwa' : 'Documentary'}')),
       body: FutureBuilder<void>(
         future: _loadFuture,
         builder: (context, snapshot) {
@@ -268,39 +279,39 @@ class _EditContentScreenState extends State<EditContentScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Episodes', style: Theme.of(context).textTheme.labelLarge),
-                  Text('${_chapterControllers.length} total'),
+                  Text('${_episodes.length} total'),
                 ],
               ),
               const SizedBox(height: 8),
-              ...List.generate(_chapterControllers.length, (i) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text('Episode ${i + 1}', style: Theme.of(context).textTheme.bodyMedium),
-                          const Spacer(),
-                          if (_chapterControllers.length > 1)
-                            IconButton(
-                              onPressed: () => _removeChapterField(i),
-                              icon: const Icon(Icons.close, size: 18),
-                              tooltip: 'Remove episode',
-                            ),
-                        ],
-                      ),
-                      TextField(
-                        controller: _chapterControllers[i],
-                        maxLines: 6,
-                        decoration: const InputDecoration(border: OutlineInputBorder()),
-                      ),
-                    ],
+              ...List.generate(_episodes.length, (i) {
+                final episode = _episodes[i];
+                final pageCount = (episode['pages'] as List).length;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: CircleAvatar(child: Text('${episode['chapterNo']}')),
+                    title: Text('Episode ${episode['chapterNo']}'),
+                    subtitle: Text('$pageCount page(s)'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () => _editEpisode(i),
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: 'Re-upload / edit pages',
+                        ),
+                        IconButton(
+                          onPressed: () => _removeEpisode(i),
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'Remove episode',
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }),
               OutlinedButton.icon(
-                onPressed: _addChapterField,
+                onPressed: _addEpisode,
                 icon: const Icon(Icons.add),
                 label: const Text('Add episode'),
               ),
