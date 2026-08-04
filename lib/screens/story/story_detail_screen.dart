@@ -81,15 +81,16 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
     }
   }
 
-  // Opens the full-screen reader for one episode -- text + Like/Dislike
-  // + Comments all live there now (merged), not on this page.
+  // Opens the full-screen reader for one episode -- pages (zero gap,
+  // pinch-zoom) + Like/Dislike + Comments all live there now (merged),
+  // not on this page.
   void _openEpisode(_DetailData data, StoryChapter chapter, int totalChapters) {
     Navigator.of(context)
         .push(MaterialPageRoute(
           builder: (_) => StoryEpisodeScreen(
             storyId: widget.storyId,
             chapterNo: chapter.chapterNo,
-            chapterText: chapter.text,
+            pages: chapter.pages,
             totalChapters: totalChapters,
             isLiked: data.interactions.isLiked,
           ),
