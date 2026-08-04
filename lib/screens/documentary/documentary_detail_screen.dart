@@ -87,7 +87,7 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
           builder: (_) => DocumentaryEpisodeScreen(
             documentaryId: widget.documentaryId,
             chapterNo: chapter.chapterNo,
-            chapterText: chapter.text,
+            pages: chapter.pages,
             totalChapters: totalChapters,
             isLiked: data.interactions.isLiked,
           ),
