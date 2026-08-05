@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/models/story_model.dart';
 import 'package:my_app/screens/documentary/documentary_detail_screen.dart';
@@ -202,12 +203,13 @@ class _HistoryTabState extends State<HistoryTab> {
                           contentPadding: EdgeInsets.zero,
                           leading: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              item.coverImageUrl,
+                            child: CachedNetworkImage(
+                              imageUrl: item.coverImageUrl,
                               width: 52,
                               height: 72,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stack) => Container(
+                              memCacheWidth: 104,
+                              errorWidget: (context, url, error) => Container(
                                 width: 52,
                                 height: 72,
                                 color: colorScheme.surfaceContainerHighest,
