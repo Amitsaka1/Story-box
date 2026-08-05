@@ -80,6 +80,30 @@ class StoryModel {
     );
   }
 
+  }
+
+  /// Inverse of fromJson -- used to persist a fetched list into
+  /// LocalCache so it can be re-hydrated instantly on next app open.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'coverImageUrl': coverImageUrl,
+      'contentUrl': contentUrl,
+      'category': category,
+      'categoryId': categoryId,
+      'status': status,
+      'rating': rating,
+      'viewCount': viewCount,
+      'likeCount': likeCount,
+      'commentCount': commentCount,
+      'addedAt': addedAt.toIso8601String(),
+      'watchProgress': isWatching ? watchProgress : null,
+      'viewedAt': viewedAt?.toIso8601String(),
+      'lastWatchedAt': lastWatchedAt?.toIso8601String(),
+    };
+  }
+
   /// Compact display like "12K", "3.4M" for view/like/comment counts.
   static String formatCount(int count) {
     if (count >= 1000000) {
