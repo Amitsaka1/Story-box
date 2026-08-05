@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:my_app/core/local_cache.dart';
 import 'package:my_app/models/story_model.dart';
 import 'package:my_app/models/category_model.dart';
 import 'package:my_app/screens/story/story_detail_screen.dart';
@@ -9,6 +10,8 @@ import 'package:my_app/widgets/story/story_card.dart';
 import 'package:my_app/widgets/story/story_section.dart';
 import 'package:my_app/widgets/story/story_category_filter_menu.dart';
 import 'package:my_app/widgets/story/story_time_filter_bar.dart';
+
+const _kGridCacheKey = 'story_grid_default';
 
 class StoryTab extends StatefulWidget {
   const StoryTab({super.key});
@@ -52,7 +55,7 @@ class _StoryTabState extends State<StoryTab> {
     _watchingFuture = _storyService.fetchWatching();
     _loadCategories();
     _loadRecentlyAdded();
-    _loadGridInitial();
+    _loadGridInitial(useCache: true);
     _scrollController.addListener(_onScroll);
   }
 
@@ -103,13 +106,36 @@ class _StoryTabState extends State<StoryTab> {
     return match.isEmpty ? null : match.first.id;
   }
 
-  Future<void> _loadGridInitial() async {
+  Future<void> _loadGridInitial({bool useCache = false}) async {
+    final isDefaultView = _selectedCategory == kAllCategories && _timeFilter == StoryTimeFilter.all;
+
+    // Show cached results immediately (no spinner) -- this only runs
+    // on the very first load, for the default unfiltered view, and
+    // only if a cache actually exists (e.g. first-ever app open won't
+    // have one, and that's fine -- it just falls through to the spinner).
+    if (useCache && isDefaultView) {
+      final cached = LocalCache.read(_kGridCacheKey);
+      if (cached != null) {
+        try {
+          final cachedStories =
+              (cached as List).map((j) => StoryModel.fromJson(j as Map<String, dynamic>)).toList();
+          setState(() {
+            _gridStories
+              ..clear()
+              ..addAll(cachedStories);
+            _initialLoading = false;
+          });
+        } catch (_) {
+          // Old/corrupt cache shape -- ignore, fresh fetch below still runs.
+        }
+      }
+    }
+
     setState(() {
-      _initialLoading = true;
+      _initialLoading = _gridStories.isEmpty;
       _gridError = null;
       _page = 1;
       _hasMore = true;
-      _gridStories.clear();
     });
     try {
       final range = computeDateRange(_timeFilter.name);
@@ -122,14 +148,19 @@ class _StoryTabState extends State<StoryTab> {
       );
       if (!mounted) return;
       setState(() {
-        _gridStories.addAll(result.data);
+        _gridStories
+          ..clear()
+          ..addAll(result.data);
         _hasMore = result.hasMore;
         _initialLoading = false;
       });
+      if (isDefaultView) {
+        LocalCache.save(_kGridCacheKey, result.data.map((s) => s.toJson()).toList());
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _gridError = e;
+        if (_gridStories.isEmpty) _gridError = e;
         _initialLoading = false;
       });
     }
