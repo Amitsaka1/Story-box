@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_app/models/story_model.dart';
-
 /// A single story's poster card -- used inside every horizontal
 /// section (Trending, Top Rated, etc). Pure UI, no logic: parent
 /// decides what list of stories to show and passes one story in.
@@ -40,23 +40,21 @@ class StoryCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.network(
-                      story.coverImageUrl,
+                    CachedNetworkImage(
+                      imageUrl: story.coverImageUrl,
                       fit: BoxFit.cover,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return Container(
-                          color: colorScheme.surfaceContainerHighest,
-                          child: const Center(
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                      memCacheWidth: 260,
+                      placeholder: (context, url) => Container(
+                        color: colorScheme.surfaceContainerHighest,
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                        );
-                      },
-                      errorBuilder: (context, error, stack) => Container(
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
                         color: colorScheme.surfaceContainerHighest,
                         child: Icon(Icons.broken_image_outlined, color: colorScheme.outline),
                       ),
