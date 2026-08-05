@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:my_app/core/local_cache.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/services/documentary_service.dart';
 import 'package:my_app/utils/date_range.dart';
@@ -7,6 +8,8 @@ import 'package:my_app/widgets/documentary/documentary_card.dart';
 import 'package:my_app/widgets/documentary/documentary_time_filter_bar.dart';
 import 'package:my_app/widgets/documentary/documentary_sort_menu.dart';
 import 'package:my_app/screens/documentary/documentary_detail_screen.dart';
+
+const _kDocGridCacheKey = 'documentary_grid_default';
 /// Documentary dashboard: time-range chips (All / Today / Yesterday /
 /// This Week / This Month / This Year) + a sort dropdown (Popular /
 /// Rating / Likes / Comments / Views). Server-side paginated + filtered
@@ -37,7 +40,7 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
   @override
   void initState() {
     super.initState();
-    _loadInitial();
+    _loadInitial(useCache: true);
     _scrollController.addListener(_onScroll);
   }
 
@@ -56,13 +59,35 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
     }
   }
 
-  Future<void> _loadInitial() async {
+  Future<void> _loadInitial({bool useCache = false}) async {
+    final isDefaultView = _timeFilter == DocumentaryTimeFilter.all && _sort == DocumentarySortOption.popularity;
+
+    // Show cached results immediately (no spinner) -- only on the very
+    // first load, for the default filter/sort, and only if a cache
+    // already exists from a previous app run.
+    if (useCache && isDefaultView) {
+      final cached = LocalCache.read(_kDocGridCacheKey);
+      if (cached != null) {
+        try {
+          final cachedDocs =
+              (cached as List).map((j) => DocumentaryModel.fromJson(j as Map<String, dynamic>)).toList();
+          setState(() {
+            _documentaries
+              ..clear()
+              ..addAll(cachedDocs);
+            _initialLoading = false;
+          });
+        } catch (_) {
+          // Old/corrupt cache shape -- ignore, fresh fetch below still runs.
+        }
+      }
+    }
+
     setState(() {
-      _initialLoading = true;
+      _initialLoading = _documentaries.isEmpty;
       _error = null;
       _page = 1;
       _hasMore = true;
-      _documentaries.clear();
     });
     try {
       final range = computeDateRange(_timeFilter.name);
@@ -75,14 +100,19 @@ class _DocumentaryTabState extends State<DocumentaryTab> {
       );
       if (!mounted) return;
       setState(() {
-        _documentaries.addAll(result.data);
+        _documentaries
+          ..clear()
+          ..addAll(result.data);
         _hasMore = result.hasMore;
         _initialLoading = false;
       });
+      if (isDefaultView) {
+        LocalCache.save(_kDocGridCacheKey, result.data.map((d) => d.toJson()).toList());
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e;
+        if (_documentaries.isEmpty) _error = e;
         _initialLoading = false;
       });
     }
