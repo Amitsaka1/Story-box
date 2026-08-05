@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_app/models/comment_model.dart';
 import 'package:my_app/models/story_content_model.dart';
 import 'package:my_app/services/story_service.dart';
@@ -118,24 +119,15 @@ class _StoryEpisodeScreenState extends State<StoryEpisodeScreen> {
                 itemCount: sorted.length,
                 itemBuilder: (context, index) {
                   final page = sorted[index];
-                  return Image.network(
-                    page.imageUrl,
+                  return CachedNetworkImage(
+                    imageUrl: page.imageUrl,
                     width: double.infinity,
                     fit: BoxFit.fitWidth,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return AspectRatio(
-                        aspectRatio: 0.7,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stack) => const AspectRatio(
+                    placeholder: (context, url) => const AspectRatio(
+                      aspectRatio: 0.7,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => const AspectRatio(
                       aspectRatio: 0.7,
                       child: Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 40)),
                     ),
