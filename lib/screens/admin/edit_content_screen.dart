@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_app/models/category_model.dart';
 import 'package:my_app/screens/admin/manhwa_chapter_upload_screen.dart';
@@ -255,12 +256,12 @@ class _EditContentScreenState extends State<EditContentScreen> {
                 borderRadius: BorderRadius.circular(8),
                 child: _newCoverBytes != null
                     ? Image.memory(_newCoverBytes!, height: 160, fit: BoxFit.cover, width: double.infinity)
-                    : Image.network(
-                        _currentCoverImageUrl ?? '',
+                    : CachedNetworkImage(
+                        imageUrl: _currentCoverImageUrl ?? '',
                         height: 160,
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        errorBuilder: (context, error, stack) => Container(
+                        errorWidget: (context, url, error) => Container(
                           height: 160,
                           color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           child: const Icon(Icons.broken_image_outlined),
