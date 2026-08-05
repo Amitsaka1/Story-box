@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_app/models/story_content_model.dart';
 import 'package:my_app/models/story_interaction_model.dart';
 import 'package:my_app/models/story_model.dart';
@@ -143,10 +144,10 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        story.coverImageUrl,
+                      CachedNetworkImage(
+                        imageUrl: story.coverImageUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stack) => Container(
+                        errorWidget: (context, url, error) => Container(
                           color: colorScheme.surfaceContainerHighest,
                           child: Icon(Icons.broken_image_outlined, size: 48, color: colorScheme.outline),
                         ),
