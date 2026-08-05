@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_app/screens/admin/edit_content_screen.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/models/story_model.dart';
@@ -328,12 +329,13 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
         return ListTile(
           leading: ClipRRect(
             borderRadius: BorderRadius.circular(6),
-            child: Image.network(
-              coverImageUrl,
+            child: CachedNetworkImage(
+              imageUrl: coverImageUrl,
               width: 44,
               height: 60,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stack) => Container(
+              memCacheWidth: 88,
+              errorWidget: (context, url, error) => Container(
                 width: 44,
                 height: 60,
                 color: colorScheme.surfaceContainerHighest,
