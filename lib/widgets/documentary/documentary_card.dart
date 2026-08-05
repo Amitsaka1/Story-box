@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_app/models/documentary_model.dart';
-
 /// A single documentary's poster card, sized for a 3-column grid.
 /// Pure UI, no logic -- parent decides what to show and passes it in.
 class DocumentaryCard extends StatelessWidget {
@@ -36,23 +36,21 @@ class DocumentaryCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    documentary.coverImageUrl,
+                  CachedNetworkImage(
+                    imageUrl: documentary.coverImageUrl,
                     fit: BoxFit.cover,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return Container(
-                        color: colorScheme.surfaceContainerHighest,
-                        child: const Center(
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+                    memCacheWidth: 260,
+                    placeholder: (context, url) => Container(
+                      color: colorScheme.surfaceContainerHighest,
+                      child: const Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                      );
-                    },
-                    errorBuilder: (context, error, stack) => Container(
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       color: colorScheme.surfaceContainerHighest,
                       child: Icon(Icons.broken_image_outlined, color: colorScheme.outline),
                     ),
