@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_app/models/comment_model.dart';
 import 'package:my_app/models/story_content_model.dart';
 import 'package:my_app/services/documentary_service.dart';
@@ -85,6 +86,7 @@ class _DocumentaryEpisodeScreenState extends State<DocumentaryEpisodeScreen> {
   @override
   Widget build(BuildContext context) {
     final sorted = [...widget.pages]..sort((a, b) => a.pageNo.compareTo(b.pageNo));
+    final decodeWidth = (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio).round();
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -109,27 +111,20 @@ class _DocumentaryEpisodeScreenState extends State<DocumentaryEpisodeScreen> {
               child: ListView.builder(
                 padding: EdgeInsets.zero,
                 physics: const ClampingScrollPhysics(),
+                cacheExtent: MediaQuery.of(context).size.height * 2,
                 itemCount: sorted.length,
                 itemBuilder: (context, index) {
                   final page = sorted[index];
-                  return Image.network(
-                    page.imageUrl,
+                  return CachedNetworkImage(
+                    imageUrl: page.imageUrl,
                     width: double.infinity,
                     fit: BoxFit.fitWidth,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return AspectRatio(
-                        aspectRatio: 0.7,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stack) => const AspectRatio(
+                    memCacheWidth: decodeWidth,
+                    placeholder: (context, url) => const AspectRatio(
+                      aspectRatio: 0.7,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => const AspectRatio(
                       aspectRatio: 0.7,
                       child: Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 40)),
                     ),
