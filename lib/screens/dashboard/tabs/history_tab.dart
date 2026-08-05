@@ -170,7 +170,7 @@ class _HistoryTabState extends State<HistoryTab> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _itemsFuture = _load()),
+      onRefresh: () => _load(),
       child: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -186,118 +186,108 @@ class _HistoryTabState extends State<HistoryTab> {
               ),
             ),
           ),
-          FutureBuilder<List<_HistoryItem>>(
-            future: _itemsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (snapshot.hasError) {
-                return SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('${snapshot.error}'),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          onPressed: () => setState(() => _itemsFuture = _load()),
-                          child: const Text('Retry'),
-                        ),
-                      ],
+          if (_loading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('$_error'),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () => _load(),
+                      child: const Text('Retry'),
                     ),
-                  ),
-                );
-              }
-
-              final items = snapshot.data ?? const [];
-              if (items.isEmpty) {
-                return SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _section == _HistorySection.watching ? Icons.play_circle_outline : Icons.check_circle_outline,
-                            size: 64,
-                            color: colorScheme.outline,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _section == _HistorySection.watching ? 'Nothing in progress yet' : 'Nothing finished yet',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Things you read or watch will show up here.',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                          ),
-                        ],
+                  ],
+                ),
+              ),
+            )
+          else if (_items.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _section == _HistorySection.watching ? Icons.play_circle_outline : Icons.check_circle_outline,
+                        size: 64,
+                        color: colorScheme.outline,
                       ),
-                    ),
-                  ),
-                );
-              }
-
-              return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final item = items[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: CachedNetworkImage(
-                              imageUrl: item.coverImageUrl,
-                              width: 52,
-                              height: 72,
-                              fit: BoxFit.cover,
-                              memCacheWidth: 104,
-                              errorWidget: (context, url, error) => Container(
-                                width: 52,
-                                height: 72,
-                                color: colorScheme.surfaceContainerHighest,
-                                child: Icon(Icons.broken_image_outlined, size: 18, color: colorScheme.outline),
-                              ),
-                            ),
-                          ),
-                          title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-                          subtitle: Text(item.isStory ? 'Story' : 'Documentary'),
-                          trailing: _section == _HistorySection.watching
-                              ? SizedBox(
-                                  width: 40,
-                                  height: 40,
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      CircularProgressIndicator(value: item.watchProgress, strokeWidth: 3),
-                                      Text('${(item.watchProgress * 100).round()}%', style: const TextStyle(fontSize: 10)),
-                                    ],
-                                  ),
-                                )
-                              : const Icon(Icons.check_circle, color: Colors.green),
-                          onTap: () => _openItem(item),
-                        ),
-                      );
-                    },
-                    childCount: items.length,
+                      const SizedBox(height: 16),
+                      Text(
+                        _section == _HistorySection.watching ? 'Nothing in progress yet' : 'Nothing finished yet',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Things you read or watch will show up here.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final item = _items[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: item.coverImageUrl,
+                            width: 52,
+                            height: 72,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 104,
+                            errorWidget: (context, url, error) => Container(
+                              width: 52,
+                              height: 72,
+                              color: colorScheme.surfaceContainerHighest,
+                              child: Icon(Icons.broken_image_outlined, size: 18, color: colorScheme.outline),
+                            ),
+                          ),
+                        ),
+                        title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(item.isStory ? 'Story' : 'Documentary'),
+                        trailing: _section == _HistorySection.watching
+                            ? SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    CircularProgressIndicator(value: item.watchProgress, strokeWidth: 3),
+                                    Text('${(item.watchProgress * 100).round()}%', style: const TextStyle(fontSize: 10)),
+                                  ],
+                                ),
+                              )
+                            : const Icon(Icons.check_circle, color: Colors.green),
+                        onTap: () => _openItem(item),
+                      ),
+                    );
+                  },
+                  childCount: _items.length,
+                ),
+              ),
+            ),
         ],
       ),
     );
