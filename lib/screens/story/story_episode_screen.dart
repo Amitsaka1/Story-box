@@ -89,6 +89,10 @@ class _StoryEpisodeScreenState extends State<StoryEpisodeScreen> {
   @override
   Widget build(BuildContext context) {
     final sorted = [...widget.pages]..sort((a, b) => a.pageNo.compareTo(b.pageNo));
+    // Decode images at actual on-screen pixel width instead of full
+    // resolution -- avoids wasting memory/CPU decoding a 1080px-wide
+    // image when the phone only needs ~400 physical pixels of it.
+    final decodeWidth = (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio).round();
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -123,6 +127,7 @@ class _StoryEpisodeScreenState extends State<StoryEpisodeScreen> {
                     imageUrl: page.imageUrl,
                     width: double.infinity,
                     fit: BoxFit.fitWidth,
+                    memCacheWidth: decodeWidth,
                     placeholder: (context, url) => const AspectRatio(
                       aspectRatio: 0.7,
                       child: Center(child: CircularProgressIndicator()),
