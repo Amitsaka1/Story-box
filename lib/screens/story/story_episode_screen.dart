@@ -120,6 +120,11 @@ class _StoryEpisodeScreenState extends State<StoryEpisodeScreen> {
               child: ListView.builder(
                 padding: EdgeInsets.zero,
                 physics: const ClampingScrollPhysics(),
+                // Preload roughly 2 screens' worth of pages ahead/behind
+                // the viewport so images start downloading before the
+                // user scrolls to them, instead of only when they
+                // become visible.
+                cacheExtent: MediaQuery.of(context).size.height * 2,
                 itemCount: sorted.length,
                 itemBuilder: (context, index) {
                   final page = sorted[index];
