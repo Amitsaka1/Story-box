@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_app/core/local_cache.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_app/models/documentary_model.dart';
 import 'package:my_app/models/story_model.dart';
@@ -45,8 +46,26 @@ class _HistoryItem {
         lastWatchedAt: d.lastWatchedAt ?? d.addedAt,
         isStory: false,
       );
-}
 
+  /// Used to persist the merged, already-sorted list into LocalCache.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'coverImageUrl': coverImageUrl,
+        'watchProgress': watchProgress,
+        'lastWatchedAt': lastWatchedAt.toIso8601String(),
+        'isStory': isStory,
+      };
+
+  factory _HistoryItem.fromCacheJson(Map<String, dynamic> json) => _HistoryItem(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        coverImageUrl: json['coverImageUrl'] as String,
+        watchProgress: (json['watchProgress'] as num).toDouble(),
+        lastWatchedAt: DateTime.parse(json['lastWatchedAt'] as String),
+        isStory: json['isStory'] as bool,
+      );
+}
 /// History: two sections -- Watching (started but not finished) and
 /// Complete (finished, per the ongoing/completed business rule) --
 /// each merging Story + Documentary together, most recent first.
@@ -62,41 +81,78 @@ class _HistoryTabState extends State<HistoryTab> {
   final _documentaryService = DocumentaryService();
 
   _HistorySection _section = _HistorySection.watching;
-  late Future<List<_HistoryItem>> _itemsFuture;
+  List<_HistoryItem> _items = [];
+  bool _loading = true;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _itemsFuture = _load();
+    _load(useCache: true);
   }
 
-  Future<List<_HistoryItem>> _load() async {
-    final List<StoryModel> stories;
-    final List<DocumentaryModel> documentaries;
+  String get _cacheKey => 'history_${_section.name}';
 
-    if (_section == _HistorySection.watching) {
-      final results = await Future.wait([_storyService.fetchWatching(), _documentaryService.fetchWatching()]);
-      stories = results[0] as List<StoryModel>;
-      documentaries = results[1] as List<DocumentaryModel>;
-    } else {
-      final results = await Future.wait([_storyService.fetchCompleted(), _documentaryService.fetchCompleted()]);
-      stories = results[0] as List<StoryModel>;
-      documentaries = results[1] as List<DocumentaryModel>;
+  Future<void> _load({bool useCache = false}) async {
+    if (useCache) {
+      final cached = LocalCache.read(_cacheKey);
+      if (cached != null) {
+        try {
+          final cachedItems =
+              (cached as List).map((j) => _HistoryItem.fromCacheJson(j as Map<String, dynamic>)).toList();
+          setState(() {
+            _items = cachedItems;
+            _loading = false;
+          });
+        } catch (_) {
+          // Old/corrupt cache shape -- ignore, fresh fetch below still runs.
+        }
+      }
     }
 
-    final items = [
-      ...stories.map(_HistoryItem.fromStory),
-      ...documentaries.map(_HistoryItem.fromDocumentary),
-    ];
-    items.sort((a, b) => b.lastWatchedAt.compareTo(a.lastWatchedAt));
-    return items;
+    setState(() {
+      _loading = _items.isEmpty;
+      _error = null;
+    });
+
+    try {
+      final List<StoryModel> stories;
+      final List<DocumentaryModel> documentaries;
+
+      if (_section == _HistorySection.watching) {
+        final results = await Future.wait([_storyService.fetchWatching(), _documentaryService.fetchWatching()]);
+        stories = results[0] as List<StoryModel>;
+        documentaries = results[1] as List<DocumentaryModel>;
+      } else {
+        final results = await Future.wait([_storyService.fetchCompleted(), _documentaryService.fetchCompleted()]);
+        stories = results[0] as List<StoryModel>;
+        documentaries = results[1] as List<DocumentaryModel>;
+      }
+
+      final freshItems = [
+        ...stories.map(_HistoryItem.fromStory),
+        ...documentaries.map(_HistoryItem.fromDocumentary),
+      ];
+      freshItems.sort((a, b) => b.lastWatchedAt.compareTo(a.lastWatchedAt));
+
+      if (!mounted) return;
+      setState(() {
+        _items = freshItems;
+        _loading = false;
+      });
+      LocalCache.save(_cacheKey, freshItems.map((i) => i.toJson()).toList());
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (_items.isEmpty) _error = e;
+        _loading = false;
+      });
+    }
   }
 
   void _onSectionChanged(Set<_HistorySection> selection) {
-    setState(() {
-      _section = selection.first;
-      _itemsFuture = _load();
-    });
+    setState(() => _section = selection.first);
+    _load(useCache: true);
   }
 
   void _openItem(_HistoryItem item) {
@@ -106,7 +162,7 @@ class _HistoryTabState extends State<HistoryTab> {
               ? StoryDetailScreen(storyId: item.id)
               : DocumentaryDetailScreen(documentaryId: item.id),
         ))
-        .then((_) => setState(() => _itemsFuture = _load()));
+        .then((_) => _load());
   }
 
   @override
