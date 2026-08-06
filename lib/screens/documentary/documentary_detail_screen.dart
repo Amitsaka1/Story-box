@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:my_app/core/local_cache.dart';
 import 'package:my_app/models/story_content_model.dart';
 import 'package:my_app/models/documentary_interaction_model.dart';
 import 'package:my_app/models/documentary_model.dart';
@@ -18,48 +19,86 @@ class DocumentaryDetailScreen extends StatefulWidget {
 class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
   final _documentaryService = DocumentaryService();
 
-  late Future<_DetailData> _dataFuture;
+  String get _cacheKey => 'documentary_detail_${widget.documentaryId}';
+
+  _DetailData? _data;
+  bool _loading = true;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _dataFuture = _load();
+    _load(useCache: true);
   }
 
-  Future<_DetailData> _load() async {
-    final documentary = await _documentaryService.fetchDocumentaryById(widget.documentaryId);
-    final interactions = await _documentaryService.fetchInteractions(widget.documentaryId);
-    final viewCount = await _documentaryService.registerView(widget.documentaryId);
-
-    StoryContentModel? content;
-    String? contentError;
-    if (documentary.contentUrl.isNotEmpty) {
-      try {
-        content = await _documentaryService.fetchDocumentaryContent(documentary.contentUrl);
-      } catch (e) {
-        contentError = '$e';
+  Future<void> _load({bool useCache = false}) async {
+    if (useCache) {
+      final cached = LocalCache.read(_cacheKey);
+      if (cached != null) {
+        try {
+          setState(() {
+            _data = _DetailData.fromCacheJson(cached as Map<String, dynamic>);
+            _loading = false;
+          });
+        } catch (_) {
+          // Old/corrupt cache shape -- ignore, fresh fetch below still runs.
+        }
       }
-    } else {
-      contentError = 'Is documentary ke liye abhi text add nahi hua hai.';
     }
 
-    return _DetailData(
-      documentary: documentary,
-      interactions: interactions,
-      liveViewCount: viewCount,
-      content: content,
-      contentError: contentError,
-    );
+    setState(() {
+      _loading = _data == null;
+      _error = null;
+    });
+
+    try {
+      final documentary = await _documentaryService.fetchDocumentaryById(widget.documentaryId);
+      final interactions = await _documentaryService.fetchInteractions(widget.documentaryId);
+      final viewCount = await _documentaryService.registerView(widget.documentaryId);
+
+      StoryContentModel? content;
+      String? contentError;
+      if (documentary.contentUrl.isNotEmpty) {
+        try {
+          content = await _documentaryService.fetchDocumentaryContent(documentary.contentUrl);
+        } catch (e) {
+          contentError = '$e';
+        }
+      } else {
+        contentError = 'Is documentary ke liye abhi text add nahi hua hai.';
+      }
+
+      final fresh = _DetailData(
+        documentary: documentary,
+        interactions: interactions,
+        liveViewCount: viewCount,
+        content: content,
+        contentError: contentError,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _data = fresh;
+        _loading = false;
+      });
+      LocalCache.save(_cacheKey, fresh.toJson());
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (_data == null) _error = e;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _toggleLike(_DetailData data) async {
     try {
       final result = await _documentaryService.toggleLike(widget.documentaryId);
       setState(() {
-        _dataFuture = Future.value(data.copyWith(
+        _data = data.copyWith(
           interactions: data.interactions.copyWith(isLiked: result.liked),
           liveLikeCount: result.likeCount,
-        ));
+        );
       });
     } catch (e) {
       if (!mounted) return;
@@ -71,10 +110,10 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
     try {
       final avg = await _documentaryService.rateDocumentary(widget.documentaryId, stars);
       setState(() {
-        _dataFuture = Future.value(data.copyWith(
+        _data = data.copyWith(
           interactions: data.interactions.copyWith(myRating: stars),
           liveRating: avg,
-        ));
+        );
       });
     } catch (e) {
       if (!mounted) return;
@@ -93,7 +132,7 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
             isLiked: data.interactions.isLiked,
           ),
         ))
-        .then((_) => setState(() => _dataFuture = _load()));
+        .then((_) => _load());
   }
 
   @override
