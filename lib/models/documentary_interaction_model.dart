@@ -24,6 +24,16 @@ class DocumentaryInteractionModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'isLiked': isLiked,
+      'myRating': myRating,
+      'progress': progress,
+      'completed': completed,
+      'lastChapterNo': lastChapterNo,
+    };
+  }
+
   DocumentaryInteractionModel copyWith({
     bool? isLiked,
     int? myRating,
