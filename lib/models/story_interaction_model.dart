@@ -26,6 +26,16 @@ class StoryInteractionModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'isLiked': isLiked,
+      'myRating': myRating,
+      'progress': progress,
+      'completed': completed,
+      'lastChapterNo': lastChapterNo,
+    };
+  }
+
   StoryInteractionModel copyWith({
     bool? isLiked,
     int? myRating,
