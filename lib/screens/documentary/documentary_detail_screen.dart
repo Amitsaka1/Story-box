@@ -138,24 +138,23 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<_DetailData>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: Builder(
+        builder: (context) {
+          if (_loading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.hasError) {
+          if (_error != null) {
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('${snapshot.error}', textAlign: TextAlign.center),
+                    Text('$_error', textAlign: TextAlign.center),
                     const SizedBox(height: 12),
                     FilledButton(
-                      onPressed: () => setState(() => _dataFuture = _load()),
+                      onPressed: () => _load(),
                       child: const Text('Retry'),
                     ),
                   ],
@@ -164,7 +163,7 @@ class _DocumentaryDetailScreenState extends State<DocumentaryDetailScreen> {
             );
           }
 
-          final data = snapshot.data!;
+          final data = _data!;
           final documentary = data.documentary;
           final interactions = data.interactions;
           final colorScheme = Theme.of(context).colorScheme;
