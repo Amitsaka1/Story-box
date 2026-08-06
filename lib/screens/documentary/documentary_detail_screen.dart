@@ -383,4 +383,24 @@ class _DetailData {
       contentError: contentError,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'documentary': documentary.toJson(),
+        'interactions': interactions.toJson(),
+        'liveViewCount': liveViewCount,
+        'liveLikeCount': liveLikeCount,
+        'liveRating': liveRating,
+        'content': content?.toJson(),
+        'contentError': contentError,
+      };
+
+  factory _DetailData.fromCacheJson(Map<String, dynamic> json) => _DetailData(
+        documentary: DocumentaryModel.fromJson(json['documentary'] as Map<String, dynamic>),
+        interactions: DocumentaryInteractionModel.fromJson(json['interactions'] as Map<String, dynamic>),
+        liveViewCount: json['liveViewCount'] as int,
+        liveLikeCount: json['liveLikeCount'] as int?,
+        liveRating: (json['liveRating'] as num?)?.toDouble(),
+        content: json['content'] != null ? StoryContentModel.fromJson(json['content'] as Map<String, dynamic>) : null,
+        contentError: json['contentError'] as String?,
+      );
 }
