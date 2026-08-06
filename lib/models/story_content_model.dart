@@ -17,6 +17,8 @@ class StoryContentModel {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {'chapters': chapters.map((c) => c.toJson()).toList()};
 }
 
 class StoryChapter {
@@ -32,6 +34,11 @@ class StoryChapter {
       pages: pagesJson.map((p) => StoryPage.fromJson(p as Map<String, dynamic>)).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'chapterNo': chapterNo,
+        'pages': pages.map((p) => p.toJson()).toList(),
+      };
 }
 
 /// One manhwa page -- just the fully-ready image, in its correct
@@ -48,4 +55,6 @@ class StoryPage {
       imageUrl: json['imageUrl'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {'pageNo': pageNo, 'imageUrl': imageUrl};
 }
