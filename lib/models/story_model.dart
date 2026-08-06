@@ -80,8 +80,6 @@ class StoryModel {
     );
   }
 
-  }
-
   /// Inverse of fromJson -- used to persist a fetched list into
   /// LocalCache so it can be re-hydrated instantly on next app open.
   Map<String, dynamic> toJson() {
