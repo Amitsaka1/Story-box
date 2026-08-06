@@ -18,48 +18,86 @@ class StoryDetailScreen extends StatefulWidget {
 class _StoryDetailScreenState extends State<StoryDetailScreen> {
   final _storyService = StoryService();
 
-  late Future<_DetailData> _dataFuture;
+  String get _cacheKey => 'story_detail_${widget.storyId}';
+
+  _DetailData? _data;
+  bool _loading = true;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _dataFuture = _load();
+    _load(useCache: true);
   }
 
-  Future<_DetailData> _load() async {
-    final story = await _storyService.fetchStoryById(widget.storyId);
-    final interactions = await _storyService.fetchInteractions(widget.storyId);
-    final viewCount = await _storyService.registerView(widget.storyId);
-
-    StoryContentModel? content;
-    String? contentError;
-    if (story.contentUrl.isNotEmpty) {
-      try {
-        content = await _storyService.fetchStoryContent(story.contentUrl);
-      } catch (e) {
-        contentError = '$e';
+  Future<void> _load({bool useCache = false}) async {
+    if (useCache) {
+      final cached = LocalCache.read(_cacheKey);
+      if (cached != null) {
+        try {
+          setState(() {
+            _data = _DetailData.fromCacheJson(cached as Map<String, dynamic>);
+            _loading = false;
+          });
+        } catch (_) {
+          // Old/corrupt cache shape -- ignore, fresh fetch below still runs.
+        }
       }
-    } else {
-      contentError = 'Is story ke liye abhi text add nahi hua hai.';
     }
 
-    return _DetailData(
-      story: story,
-      interactions: interactions,
-      liveViewCount: viewCount,
-      content: content,
-      contentError: contentError,
-    );
+    setState(() {
+      _loading = _data == null;
+      _error = null;
+    });
+
+    try {
+      final story = await _storyService.fetchStoryById(widget.storyId);
+      final interactions = await _storyService.fetchInteractions(widget.storyId);
+      final viewCount = await _storyService.registerView(widget.storyId);
+
+      StoryContentModel? content;
+      String? contentError;
+      if (story.contentUrl.isNotEmpty) {
+        try {
+          content = await _storyService.fetchStoryContent(story.contentUrl);
+        } catch (e) {
+          contentError = '$e';
+        }
+      } else {
+        contentError = 'Is story ke liye abhi text add nahi hua hai.';
+      }
+
+      final fresh = _DetailData(
+        story: story,
+        interactions: interactions,
+        liveViewCount: viewCount,
+        content: content,
+        contentError: contentError,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _data = fresh;
+        _loading = false;
+      });
+      LocalCache.save(_cacheKey, fresh.toJson());
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (_data == null) _error = e;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _toggleLike(_DetailData data) async {
     try {
       final result = await _storyService.toggleLike(widget.storyId);
       setState(() {
-        _dataFuture = Future.value(data.copyWith(
+        _data = data.copyWith(
           interactions: data.interactions.copyWith(isLiked: result.liked),
           liveLikeCount: result.likeCount,
-        ));
+        );
       });
     } catch (e) {
       if (!mounted) return;
@@ -71,10 +109,10 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
     try {
       final avg = await _storyService.rateStory(widget.storyId, stars);
       setState(() {
-        _dataFuture = Future.value(data.copyWith(
+        _data = data.copyWith(
           interactions: data.interactions.copyWith(myRating: stars),
           liveRating: avg,
-        ));
+        );
       });
     } catch (e) {
       if (!mounted) return;
@@ -96,30 +134,29 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
             isLiked: data.interactions.isLiked,
           ),
         ))
-        .then((_) => setState(() => _dataFuture = _load()));
+        .then((_) => _load());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<_DetailData>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: Builder(
+        builder: (context) {
+          if (_loading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.hasError) {
+          if (_error != null) {
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('${snapshot.error}', textAlign: TextAlign.center),
+                    Text('$_error', textAlign: TextAlign.center),
                     const SizedBox(height: 12),
                     FilledButton(
-                      onPressed: () => setState(() => _dataFuture = _load()),
+                      onPressed: () => _load(),
                       child: const Text('Retry'),
                     ),
                   ],
@@ -128,7 +165,7 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
             );
           }
 
-          final data = snapshot.data!;
+          final data = _data!;
           final story = data.story;
           final interactions = data.interactions;
           final colorScheme = Theme.of(context).colorScheme;
@@ -352,4 +389,24 @@ class _DetailData {
       contentError: contentError,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'story': story.toJson(),
+        'interactions': interactions.toJson(),
+        'liveViewCount': liveViewCount,
+        'liveLikeCount': liveLikeCount,
+        'liveRating': liveRating,
+        'content': content?.toJson(),
+        'contentError': contentError,
+      };
+
+  factory _DetailData.fromCacheJson(Map<String, dynamic> json) => _DetailData(
+        story: StoryModel.fromJson(json['story'] as Map<String, dynamic>),
+        interactions: StoryInteractionModel.fromJson(json['interactions'] as Map<String, dynamic>),
+        liveViewCount: json['liveViewCount'] as int,
+        liveLikeCount: json['liveLikeCount'] as int?,
+        liveRating: (json['liveRating'] as num?)?.toDouble(),
+        content: json['content'] != null ? StoryContentModel.fromJson(json['content'] as Map<String, dynamic>) : null,
+        contentError: json['contentError'] as String?,
+      );
 }
