@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/models/story_model.dart';
+import 'package:my_app/models/category_model.dart';
 import 'package:my_app/screens/story/story_detail_screen.dart';
 import 'package:my_app/services/story_service.dart';
 import 'package:my_app/widgets/story/story_card.dart';
@@ -10,7 +11,8 @@ import 'package:my_app/widgets/story/story_category_filter_menu.dart';
 /// category selected it shows the overall top 20 across every story;
 /// picking a category re-ranks and shows that category's own top 20.
 ///
-/// Stories come from the backend (GET /stories) instead of dummy data.
+/// Ranking happens server-side (GET /stories/trending) -- this screen
+/// never pulls the whole catalog to the device.
 class TrendingScreen extends StatefulWidget {
   const TrendingScreen({super.key});
 
@@ -21,29 +23,38 @@ class TrendingScreen extends StatefulWidget {
 class _TrendingScreenState extends State<TrendingScreen> {
   final _storyService = StoryService();
   late Future<List<StoryModel>> _storiesFuture;
+  List<CategoryModel> _categories = [];
 
   String _selectedCategory = kAllCategories;
-  static const int _limit = 20;
 
   @override
   void initState() {
     super.initState();
-    _storiesFuture = _storyService.fetchStories();
+    _storiesFuture = _storyService.fetchTrending();
+    _loadCategories();
   }
 
-  List<StoryModel> _topStories(List<StoryModel> stories) {
-    final source = _selectedCategory == kAllCategories
-        ? stories
-        : stories.where((s) => s.category == _selectedCategory).toList();
-
-    final sorted = [...source]..sort((a, b) => b.popularityScore.compareTo(a.popularityScore));
-    return sorted.take(_limit).toList();
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await _storyService.fetchCategories();
+      if (!mounted) return;
+      setState(() => _categories = categories);
+    } catch (_) {
+      // Not critical -- dropdown just shows "All" only if this fails.
+    }
   }
 
-  List<String> _categoriesFrom(List<StoryModel> stories) {
-    final categories = stories.map((s) => s.category).toSet().toList();
-    categories.sort();
-    return categories;
+  String? get _selectedCategoryId {
+    if (_selectedCategory == kAllCategories) return null;
+    final match = _categories.where((c) => c.name == _selectedCategory);
+    return match.isEmpty ? null : match.first.id;
+  }
+
+  void _onCategoryChanged(String category) {
+    setState(() {
+      _selectedCategory = category;
+      _storiesFuture = _storyService.fetchTrending(categoryId: _selectedCategoryId);
+    });
   }
 
   void _openStory(StoryModel story) {
@@ -54,6 +65,8 @@ class _TrendingScreenState extends State<TrendingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final categoryNames = _categories.map((c) => c.name).toList()..sort();
+
     return Scaffold(
       appBar: AppBar(
         title: Text('story.top20_title'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -74,8 +87,7 @@ class _TrendingScreenState extends State<TrendingScreen> {
             );
           }
 
-          final allStories = snapshot.data ?? const [];
-          final stories = _topStories(allStories);
+          final stories = snapshot.data ?? const [];
 
           return CustomScrollView(
             slivers: [
@@ -85,9 +97,9 @@ class _TrendingScreenState extends State<TrendingScreen> {
                   child: Row(
                     children: [
                       StoryCategoryFilterMenu(
-                        categories: _categoriesFrom(allStories),
+                        categories: categoryNames,
                         selected: _selectedCategory,
-                        onChanged: (category) => setState(() => _selectedCategory = category),
+                        onChanged: _onCategoryChanged,
                       ),
                       Text(
                         _selectedCategory == kAllCategories ? 'story.all_categories'.tr() : _selectedCategory,
