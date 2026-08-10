@@ -17,16 +17,6 @@ class DocumentaryService {
     return fallback;
   }
 
-  Future<List<DocumentaryModel>> fetchDocumentaries() async {
-    try {
-      final res = await _dio.get('/documentaries');
-      final list = res.data as List;
-      return list.map((json) => DocumentaryModel.fromJson(json as Map<String, dynamic>)).toList();
-    } on DioException catch (e) {
-      throw _extractError(e, 'Could not load documentaries.');
-    }
-  }
-
   /// Paginated + filtered variant -- used by the documentary grid's
   /// infinite scroll. sort/from/to are optional.
   Future<({List<DocumentaryModel> data, bool hasMore, int totalCount})> fetchDocumentariesPaged({
