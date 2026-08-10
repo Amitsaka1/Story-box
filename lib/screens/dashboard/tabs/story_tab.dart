@@ -216,7 +216,10 @@ class _StoryTabState extends State<StoryTab> {
   void _openStory(StoryModel story) {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => StoryDetailScreen(storyId: story.id)))
-        .then((_) => _refresh());
+        .then((_) {
+      if (!mounted) return;
+      setState(() => _watchingFuture = _storyService.fetchWatching());
+    });
   }
 
   String _timeAgo(DateTime time) {
