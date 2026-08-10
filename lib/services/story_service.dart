@@ -17,15 +17,17 @@ class StoryService {
     return fallback;
   }
 
-  /// All stories, newest first. Category/time filtering and sorting
-  /// stays on-device -- catalog small enough for now.
-  Future<List<StoryModel>> fetchStories() async {
+  /// Top 20 by popularity, ranked server-side. categoryId optional --
+  /// omit for the overall top 20, pass it to get one category's own top 20.
+  Future<List<StoryModel>> fetchTrending({String? categoryId}) async {
     try {
-      final res = await _dio.get('/stories');
+      final res = await _dio.get('/stories/trending', queryParameters: {
+        if (categoryId != null) 'categoryId': categoryId,
+      });
       final list = res.data as List;
       return list.map((json) => StoryModel.fromJson(json as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
-      throw _extractError(e, 'Could not load stories.');
+      throw _extractError(e, 'Could not load trending stories.');
     }
   }
 
