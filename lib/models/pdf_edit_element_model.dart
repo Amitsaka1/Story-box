@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// bina kisi bubble outline ke.
 enum BubbleType { none, caption, dialogue, thought }
 
-/// Ek editable element jo PDF page ke upar overlay hota hai —
+/// Ek editable element jo PDF page ke upar overlay hota hai --
 /// ye kabhi bhi real PDF content ko touch nahi karta, sirf
 /// canvas ke upar draw hota hai. Export ke waqt isi ko flatten
 /// karke naya PDF banta hai.
@@ -12,7 +12,7 @@ class PdfEditElement {
   final String id;
   BubbleType type;
   String text;
-  Offset position; // element ka center point, page canvas ke relative
+  Offset position; // element ka top-left corner, page canvas ke relative
   double fontSize;
   Color textColor;
   Color bubbleColor;
