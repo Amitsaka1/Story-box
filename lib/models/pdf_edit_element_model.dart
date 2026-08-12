@@ -29,6 +29,9 @@ class PdfEditElement {
   Offset position; // bubble ka top-left corner, page canvas ke relative
   double width;
   double height;
+  double fontSize;
+  Color textColor;
+  Color bubbleColor;
 
   PdfEditElement({
     required this.id,
@@ -37,8 +40,14 @@ class PdfEditElement {
     required this.position,
     double? width,
     double? height,
+    double? fontSize,
+    Color? textColor,
+    Color? bubbleColor,
   })  : width = width ?? (kBubbleDefaultSizes[type]?.width ?? 160),
-        height = height ?? (kBubbleDefaultSizes[type]?.height ?? 60);
+        height = height ?? (kBubbleDefaultSizes[type]?.height ?? 60),
+        fontSize = fontSize ?? 14,
+        textColor = textColor ?? Colors.black,
+        bubbleColor = bubbleColor ?? Colors.white;
 }
 
 /// Ek PDF page ke saare elements ko group karta hai, taaki
