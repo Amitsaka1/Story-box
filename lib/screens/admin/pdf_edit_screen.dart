@@ -30,10 +30,30 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
   bool _exporting = false;
   String? _error;
 
-  // Kaunsa element selected hai (border + delete icon dikhta hai) aur
-  // kaunsa element abhi text-edit mode me hai (TextField dikhta hai).
+  // Kaunsa element selected hai (border + delete/resize/type-toolbar
+  // dikhta hai) aur kaunsa element abhi text-edit mode me hai (TextField
+  // dikhta hai).
   String? _selectedId;
   String? _editingId;
+
+  // Jab tak koi element drag/resize ho raha hai, InteractiveViewer ka
+  // apna pan gesture disable rehta hai -- warna dono gesture aapas me
+  // fight karte hain aur bubble move karne ki jagah poora page pan
+  // ho jaata hai.
+  String? _draggingElementId;
+
+  // Zoom/scale track karne ke liye -- drag delta ko current scale se
+  // divide karna padta hai warna zoom-in karne par bubble finger se
+  // zyada/kam move hota hai.
+  final TransformationController _transformationController =
+      TransformationController();
+  double get _currentScale =>
+      _transformationController.value.getMaxScaleOnAxis();
+
+  // Har text element ka apna TextEditingController -- id se persist
+  // hota hai taaki har rebuild par naya controller na bane (jo cursor
+  // position glitch karta tha).
+  final Map<String, TextEditingController> _textControllers = {};
 
   // Har page ka canvas (image + overlay) isi key se wrap hoga, taaki
   // Step 7 (export) me RepaintBoundary.toImage() se capture kar sakein.
@@ -42,7 +62,25 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
   @override
   void dispose() {
     _document?.close();
+    _transformationController.dispose();
+    for (final c in _textControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  TextEditingController _controllerFor(PdfEditElement el) {
+    return _textControllers.putIfAbsent(
+      el.id,
+      () => TextEditingController(text: el.text),
+    );
+  }
+
+  void _enterEditMode(PdfEditElement el) {
+    final controller = _controllerFor(el);
+    controller.text = el.text;
+    controller.selection = TextSelection.collapsed(offset: el.text.length);
+    _editingId = el.id;
   }
 
   Future<void> _pickAndOpenPdf() async {
@@ -112,17 +150,16 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
 
   void _addElement() {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
+    final el = PdfEditElement(
+      id: id,
+      type: BubbleType.caption,
+      text: 'Text',
+      position: const Offset(80, 80),
+    );
     setState(() {
-      _pages[_currentPageIndex].elements.add(
-            PdfEditElement(
-              id: id,
-              type: BubbleType.caption,
-              text: 'Text',
-              position: const Offset(80, 80),
-            ),
-          );
+      _pages[_currentPageIndex].elements.add(el);
       _selectedId = id;
-      _editingId = id;
+      _enterEditMode(el);
     });
   }
 
@@ -131,6 +168,8 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
       _pages[_currentPageIndex].elements.removeWhere((e) => e.id == id);
       if (_selectedId == id) _selectedId = null;
       if (_editingId == id) _editingId = null;
+      if (_draggingElementId == id) _draggingElementId = null;
+      _textControllers.remove(id)?.dispose();
     });
   }
 
@@ -152,35 +191,90 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     });
   }
 
+  IconData _iconForType(BubbleType type) {
+    switch (type) {
+      case BubbleType.caption:
+        return Icons.crop_square;
+      case BubbleType.dialogue:
+        return Icons.chat_bubble_outline;
+      case BubbleType.thought:
+        return Icons.cloud_outlined;
+      case BubbleType.none:
+        return Icons.text_fields;
+    }
+  }
+
+  // Diye gaye box (maxWidth x maxHeight) ke andar text ko wrap karke
+  // sabse bada font size dhoondta hai jisse text poore box me fit ho
+  // jaaye -- na to horizontal me overflow ho, na box se bahar jaaye.
+  // Chota text bhi box ke hisab se bada font paayega, bada text apne
+  // aap chhota font le lega. Ye hi function UI aur PDF export dono me
+  // use hota hai taaki dono ek jaisa dikhein.
+  double _fitFontSize({
+    required String text,
+    required double maxWidth,
+    required double maxHeight,
+    double minFontSize = 8,
+    double maxFontSize = 34,
+  }) {
+    final content = text.isEmpty ? ' ' : text;
+    bool fits(double fontSize) {
+      final tp = TextPainter(
+        text: TextSpan(text: content, style: TextStyle(fontSize: fontSize)),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: maxWidth);
+      return tp.height <= maxHeight;
+    }
+
+    if (fits(maxFontSize)) return maxFontSize;
+    if (!fits(minFontSize)) return minFontSize;
+
+    double lo = minFontSize;
+    double hi = maxFontSize;
+    while (hi - lo > 0.5) {
+      final mid = (lo + hi) / 2;
+      if (fits(mid)) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo;
+  }
+
   // Ek page ka bubble/text element ko raw Canvas pe draw karta hai --
   // widget tree ki zaroorat nahi, isliye har page (chahe screen pe
   // dikh raha ho ya na ho) export ke waqt sahi se render ho jaata hai.
+  // Bubble ka size hamesha el.width x el.height (fixed) hota hai --
+  // text usi ke andar wrap + auto-fit hota hai, exact UI jaisa.
   void _drawElementOnCanvas(Canvas canvas, PdfEditElement el) {
     final innerH = el.type == BubbleType.none ? 4.0 : 14.0;
     final innerV = el.type == BubbleType.none ? 4.0 : 10.0;
+    final availW = (el.width - innerH * 2).clamp(10.0, double.infinity);
+    final availH = (el.height - innerV * 2).clamp(10.0, double.infinity);
+
+    final fontSize = _fitFontSize(text: el.text, maxWidth: availW, maxHeight: availH);
 
     final textPainter = TextPainter(
       text: TextSpan(
         text: el.text,
-        style: TextStyle(fontSize: el.fontSize, color: el.textColor),
+        style: TextStyle(fontSize: fontSize, color: el.textColor),
       ),
       textDirection: TextDirection.ltr,
-    )..layout();
+      textAlign: TextAlign.center,
+    )..layout(maxWidth: availW);
 
-    final bubbleSize = Size(
-      textPainter.width + innerH * 2,
-      textPainter.height + innerV * 2,
-    );
-
-    // Outer Container ka 4px all-round padding match karne ke liye.
-    final stackOrigin = el.position + const Offset(4, 4);
+    final bubbleSize = Size(el.width, el.height);
 
     canvas.save();
-    canvas.translate(stackOrigin.dx, stackOrigin.dy);
+    canvas.translate(el.position.dx, el.position.dy);
     _BubblePainter(type: el.type, color: el.bubbleColor).paint(canvas, bubbleSize);
     canvas.restore();
 
-    textPainter.paint(canvas, stackOrigin + Offset(innerH, innerV));
+    final textX = el.position.dx + innerH + (availW - textPainter.width) / 2;
+    final textY = el.position.dy + innerV + (availH - textPainter.height) / 2;
+    textPainter.paint(canvas, Offset(textX, textY));
   }
 
   Future<void> _exportPdf() async {
@@ -343,6 +437,10 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     final elements = _pages[_currentPageIndex].elements;
 
     return InteractiveViewer(
+      transformationController: _transformationController,
+      // Jab tak koi bubble drag/resize ho raha hai, page ka apna pan
+      // disable -- warna dono gesture aapas me clash karte hain.
+      panEnabled: _draggingElementId == null,
       minScale: 1,
       maxScale: 4,
       child: Center(
@@ -368,41 +466,53 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
     final isSelected = _selectedId == el.id;
     final isEditing = _editingId == el.id;
 
+    final innerH = el.type == BubbleType.none ? 4.0 : 14.0;
+    final innerV = el.type == BubbleType.none ? 4.0 : 10.0;
+    final availW = (el.width - innerH * 2).clamp(10.0, double.infinity);
+    final availH = (el.height - innerV * 2).clamp(10.0, double.infinity);
+    final fitFontSize = _fitFontSize(text: el.text, maxWidth: availW, maxHeight: availH);
+
     return Positioned(
       left: el.position.dx,
       top: el.position.dy,
-      child: GestureDetector(
-        // Editing mode me drag disable, taaki TextField ke andar
-        // cursor place karna aasan rahe.
-        onPanUpdate: isEditing
-            ? null
-            : (details) {
-                setState(() => el.position += details.delta);
-              },
-        onTap: () {
-          setState(() {
-            if (_selectedId != el.id) {
-              // Pehla tap: sirf select karo (border + delete icon dikhao).
-              _selectedId = el.id;
-              _editingId = null;
-            } else {
-              // Dubara tap (already selected): edit mode me jao.
-              _editingId = el.id;
-            }
-          });
-        },
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // --- Move + select/edit area: SIRF bubble body tak scoped hai,
+          // taaki delete/resize/type buttons is drag-gesture ke andar
+          // na aayein aur unke taps humesha reliably fire hon. ---
+          GestureDetector(
+            onPanStart: isEditing
+                ? null
+                : (_) => setState(() => _draggingElementId = el.id),
+            onPanUpdate: isEditing
+                ? null
+                : (details) {
+                    setState(() => el.position += details.delta / _currentScale);
+                  },
+            onPanEnd: (_) => setState(() => _draggingElementId = null),
+            onPanCancel: () => setState(() => _draggingElementId = null),
+            onTap: () {
+              setState(() {
+                if (_selectedId != el.id) {
+                  // Pehla tap: sirf select karo (border + toolbar dikhao).
+                  _selectedId = el.id;
+                  _editingId = null;
+                } else {
+                  // Dubara tap (already selected): edit mode me jao.
+                  _enterEditMode(el);
+                }
+              });
+            },
+            child: Container(
+              width: el.width,
+              height: el.height,
               decoration: isSelected
                   ? BoxDecoration(
                       border: Border.all(color: Colors.blueAccent, width: 1.5),
                     )
                   : null,
-              padding: const EdgeInsets.all(4),
               child: Stack(
-                clipBehavior: Clip.none,
                 children: [
                   Positioned.fill(
                     child: CustomPaint(
@@ -410,49 +520,118 @@ class _PdfEditScreenState extends State<PdfEditScreen> {
                     ),
                   ),
                   Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: el.type == BubbleType.none ? 4 : 14,
-                      vertical: el.type == BubbleType.none ? 4 : 10,
-                    ),
-                    child: isEditing
-                        ? IntrinsicWidth(
-                            child: TextField(
+                    padding: EdgeInsets.symmetric(horizontal: innerH, vertical: innerV),
+                    child: Center(
+                      child: isEditing
+                          ? TextField(
                               autofocus: true,
-                              controller: TextEditingController(text: el.text)
-                                ..selection = TextSelection.collapsed(offset: el.text.length),
-                              style: TextStyle(fontSize: el.fontSize, color: el.textColor),
+                              controller: _controllerFor(el),
+                              maxLines: null,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: fitFontSize, color: el.textColor),
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 isDense: true,
                               ),
-                              onChanged: (v) => el.text = v,
+                              onChanged: (v) => setState(() => el.text = v),
                               onSubmitted: (_) => setState(() => _editingId = null),
                               onTapOutside: (_) => setState(() => _editingId = null),
+                            )
+                          : Text(
+                              el.text,
+                              textAlign: TextAlign.center,
+                              softWrap: true,
+                              style: TextStyle(fontSize: fitFontSize, color: el.textColor),
                             ),
-                          )
-                        : Text(
-                            el.text,
-                            style: TextStyle(fontSize: el.fontSize, color: el.textColor),
-                          ),
+                    ),
                   ),
                 ],
               ),
             ),
-            if (isSelected && !isEditing)
-              Positioned(
-                right: -10,
-                top: -10,
-                child: GestureDetector(
-                  onTap: () => _deleteElement(el.id),
-                  child: const CircleAvatar(
-                    radius: 11,
-                    backgroundColor: Colors.red,
-                    child: Icon(Icons.close, size: 14, color: Colors.white),
-                  ),
+          ),
+
+          // --- Selection-only controls: har ek APNA gesture detector
+          // leke bubble-move detector ke BAAHAR (sibling) baitha hai,
+          // isliye inka tap kabhi bhi drag-gesture se clash nahi karta. ---
+          if (isSelected && !isEditing) ...[
+            // Type switcher toolbar (caption / dialogue / thought / none)
+            Positioned(
+              left: 0,
+              top: -38,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: BubbleType.values.map((t) {
+                    final active = el.type == t;
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => el.type = t),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: active ? Colors.blueAccent : Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Icon(_iconForType(t), size: 15, color: Colors.white),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
+            ),
+
+            // Delete button
+            Positioned(
+              right: -10,
+              top: -10,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _deleteElement(el.id),
+                child: const CircleAvatar(
+                  radius: 11,
+                  backgroundColor: Colors.red,
+                  child: Icon(Icons.close, size: 14, color: Colors.white),
+                ),
+              ),
+            ),
+
+            // Resize handle -- bottom-right corner se drag karke
+            // bubble ka width/height badhao-ghataao.
+            Positioned(
+              right: -10,
+              bottom: -10,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanStart: (_) => setState(() => _draggingElementId = el.id),
+                onPanUpdate: (details) {
+                  final scale = _currentScale;
+                  setState(() {
+                    el.width = (el.width + details.delta.dx / scale).clamp(40.0, 700.0);
+                    el.height = (el.height + details.delta.dy / scale).clamp(30.0, 700.0);
+                  });
+                },
+                onPanEnd: (_) => setState(() => _draggingElementId = null),
+                onPanCancel: () => setState(() => _draggingElementId = null),
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: const Icon(Icons.open_in_full, size: 12, color: Colors.white),
+                ),
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -534,6 +713,7 @@ class _BubblePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BubblePainter oldDelegate) {
-    return oldDelegate.type != type || oldDelegate.color != color;
+    return oldDelegate.type != type ||
+        oldDelegate.color != color;
   }
 }
