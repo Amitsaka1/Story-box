@@ -16,7 +16,7 @@ class PdfEditScreen extends StatefulWidget {
 
 class _PdfEditScreenState extends State<PdfEditScreen> {
   PdfDocument? _document;
-  final List<PdfImage?> _pageImages = [];
+  final List<PdfPageImage?> _pageImages = [];
   final List<PdfEditPage> _pages = [];
 
   int _currentPageIndex = 0;
