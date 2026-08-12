@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:my_app/providers/auth_provider.dart';
 import 'package:my_app/screens/admin/add_content_screen.dart';
 import 'package:my_app/screens/admin/manage_content_screen.dart';
+import 'package:my_app/screens/admin/pdf_edit_screen.dart';
 import 'package:my_app/widgets/dashboard/dashboard_app_bar.dart';
 import 'package:my_app/widgets/dashboard/dashboard_bottom_nav.dart';
 import 'package:my_app/screens/story/trending_screen.dart';
@@ -61,6 +62,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openPdfEdit() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PdfEditScreen()),
+    );
+  }
+
   void _showAdminMenu() {
     showModalBottomSheet(
       context: context,
@@ -82,6 +89,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onTap: () {
                 Navigator.of(context).pop();
                 _openManageContent();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('PDF Editor'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _openPdfEdit();
               },
             ),
           ],
